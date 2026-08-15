@@ -35,9 +35,11 @@ export default function Cuenta() {
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
+      // Sin color propio, el contenedor de la tab nativa se ve blanco detras.
+      style={styles.pantalla}
       contentContainerStyle={[
         styles.contenido,
-        { paddingTop: insets.top + espacio[4], paddingBottom: espacio[18] },
+        { paddingTop: insets.top + espacio[4], paddingBottom: insets.bottom + 120 },
       ]}>
       <View>
         <Texto variante="micro">Cuenta</Texto>
@@ -106,6 +108,10 @@ export default function Cuenta() {
 }
 
 const styles = StyleSheet.create({
+  pantalla: {
+    flex: 1,
+    backgroundColor: color.fondo,
+  },
   contenido: {
     paddingHorizontal: margenPantalla,
     gap: espacio[6],

@@ -39,6 +39,15 @@ export const texto = {
     color: color.texto,
     ...tabular,
   },
+  /** Cifra secundaria · 26/32 — misma familia que la cifra grande, no la de titulos. */
+  cifraMedia: {
+    fontFamily: fuente.display,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.7,
+    color: color.texto,
+    ...tabular,
+  },
   /** Display · 34/38 */
   display: {
     fontFamily: fuente.display,

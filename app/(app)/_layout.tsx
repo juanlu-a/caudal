@@ -1,5 +1,6 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
+import { AccesorioAgregar } from '../../src/components/AccesorioAgregar';
 import { color, palette } from '../../src/theme';
 
 /**
@@ -14,6 +15,10 @@ export default function AppLayout() {
       backgroundColor={palette.fondeo}
       minimizeBehavior="onScrollDown"
       iconColor={{ default: color.textoTerciario, selected: color.acento }}>
+      <NativeTabs.BottomAccessory>
+        <AccesorioAgregar />
+      </NativeTabs.BottomAccessory>
+
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: 'drop', selected: 'drop.fill' }} />
         <NativeTabs.Trigger.Label>Mes</NativeTabs.Trigger.Label>

@@ -11,7 +11,7 @@ type Props = {
   moneda?: string;
   /** 'auto' pinta el ingreso en verde; 'neutro' deja la cifra en Espuma. */
   tono?: 'auto' | 'neutro';
-  variante?: 'cifra' | 'display' | 'titulo1';
+  variante?: 'cifra' | 'display' | 'cifraMedia';
   decimales?: 'siempre' | 'ocultarEnCero';
   /** Linea corta debajo de la cifra: variacion, periodo, aclaracion. */
   pie?: React.ReactNode;

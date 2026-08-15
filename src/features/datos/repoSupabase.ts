@@ -1,4 +1,4 @@
-import { aFechaISO, inicioDeMes, sumarMeses } from '../../lib/format';
+import { aFechaISO, inicioDeMes, parseFechaISO, sumarMeses } from '../../lib/format';
 import { pedirSupabase } from '../../lib/supabase';
 import type { MovimientoConCategoria, TotalesDelMes } from '../../types/database';
 import type { Repositorio } from './repo';
@@ -41,7 +41,9 @@ export const repositorio: Repositorio = {
       .limit(limite);
 
     if (mes) {
-      q = q.gte('occurred_on', mes).lt('occurred_on', aFechaISO(sumarMeses(new Date(mes), 1)));
+      // parseFechaISO y no new Date(mes): la fecha ISO se parsea en UTC y al oeste
+      // de Greenwich cae el dia anterior, con lo que el rango del mes queda vacio.
+      q = q.gte('occurred_on', mes).lt('occurred_on', aFechaISO(sumarMeses(parseFechaISO(mes), 1)));
     }
 
     const { data, error } = await q;

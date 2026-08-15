@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { aFechaISO, inicioDeMes, sumarMeses } from '../../lib/format';
+import { aFechaISO, inicioDeMes, parseFechaISO, sumarMeses } from '../../lib/format';
 import type {
   Categoria,
   MovimientoConCategoria,
@@ -173,11 +173,12 @@ export const repositorio: Repositorio = {
 
   async movimientos(mes, limite = 200) {
     const estado = await leer();
-    const lista = ordenar(estado.movimientos).filter((m) => {
-      if (!mes) return true;
-      const hasta = aFechaISO(sumarMeses(new Date(mes), 1));
-      return m.occurred_on >= mes && m.occurred_on < hasta;
-    });
+    // parseFechaISO y no new Date(mes): la fecha ISO se parsea en UTC y al oeste
+    // de Greenwich cae el dia anterior, con lo que el rango del mes queda vacio.
+    const hasta = mes ? aFechaISO(sumarMeses(parseFechaISO(mes), 1)) : null;
+    const lista = ordenar(estado.movimientos).filter(
+      (m) => !mes || !hasta || (m.occurred_on >= mes && m.occurred_on < hasta),
+    );
     return lista.slice(0, limite);
   },
 
@@ -190,7 +191,7 @@ export const repositorio: Repositorio = {
     const acumulado = new Map<string, TotalesDelMes>();
 
     for (const m of estado.movimientos) {
-      const mes = inicioDeMes(new Date(m.occurred_on));
+      const mes = inicioDeMes(parseFechaISO(m.occurred_on));
       const actual =
         acumulado.get(mes) ??
         ({

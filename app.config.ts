@@ -16,7 +16,9 @@ const config: ExpoConfig = {
     bundleIdentifier: 'com.juanabreu.caudal',
     supportsTablet: false,
     infoPlist: {
-      UIViewControllerBasedStatusBarAppearance: true,
+      // expo-status-bar maneja el estilo desde JS: con la clave en true,
+      // RCTStatusBarManager tira error al setearlo.
+      UIViewControllerBasedStatusBarAppearance: false,
     },
   },
   android: {

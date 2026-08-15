@@ -75,7 +75,7 @@ export default function Movimientos() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
           paddingHorizontal: margenPantalla,
-          paddingBottom: espacio[18],
+          paddingBottom: insets.bottom + 120,
         }}
         ListHeaderComponent={
           <View style={[styles.encabezado, { paddingTop: insets.top + espacio[4] }]}>

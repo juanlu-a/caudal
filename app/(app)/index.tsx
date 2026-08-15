@@ -1,8 +1,6 @@
-import { useRouter } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BotonFlotante } from '../../src/components/BotonFlotante';
 import { Cifra } from '../../src/components/Cifra';
 import { EstadoVacio } from '../../src/components/EstadoVacio';
 import { FilaMovimiento } from '../../src/components/FilaMovimiento';
@@ -25,7 +23,6 @@ import {
 import { color, espacio, margenPantalla } from '../../src/theme';
 
 export default function Mes() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const mesActual = inicioDeMes(new Date());
 
@@ -54,7 +51,9 @@ export default function Mes() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
           styles.contenido,
-          { paddingTop: insets.top + espacio[4], paddingBottom: espacio[18] },
+          // La barra de tabs y su accesorio de vidrio flotan sobre el contenido:
+          // este aire evita que tapen la ultima fila.
+          { paddingTop: insets.top + espacio[4], paddingBottom: insets.bottom + 120 },
         ]}
         refreshControl={
           <RefreshControl
@@ -76,6 +75,9 @@ export default function Mes() {
             etiqueta="Saldo del mes"
             valor={esteMes?.saldo ?? 0}
             moneda={moneda}
+            // El saldo no es un ingreso: va neutro. El verde se reserva para lo que
+            // entra, para que quede un solo acento por pieza.
+            tono="neutro"
             decimales="ocultarEnCero"
             pie={
               variacion != null ? (
@@ -93,7 +95,7 @@ export default function Mes() {
               <Cifra
                 valor={esteMes?.ingresos ?? 0}
                 moneda={moneda}
-                variante="titulo1"
+                variante="cifraMedia"
                 decimales="ocultarEnCero"
               />
             </View>
@@ -102,7 +104,7 @@ export default function Mes() {
               <Cifra
                 valor={esteMes?.gastos ?? 0}
                 moneda={moneda}
-                variante="titulo1"
+                variante="cifraMedia"
                 tono="neutro"
                 decimales="ocultarEnCero"
               />
@@ -143,10 +145,6 @@ export default function Mes() {
           )}
         </View>
       </ScrollView>
-
-      <View style={[styles.flotante, { bottom: insets.bottom + espacio[18] }]}>
-        <BotonFlotante onPress={() => router.push('/nuevo')}>Agregar</BotonFlotante>
-      </View>
     </View>
   );
 }
@@ -179,11 +177,5 @@ const styles = StyleSheet.create({
   },
   lista: {
     gap: espacio[1],
-  },
-  flotante: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
   },
 });
