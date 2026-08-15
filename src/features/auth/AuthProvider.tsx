@@ -2,11 +2,14 @@ import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { supabase } from '../../lib/supabase';
+import { modoDemo } from '../../lib/config';
+import { pedirSupabase, supabase } from '../../lib/supabase';
 
 type Contexto = {
   session: Session | null;
   cargando: boolean;
+  /** En modo demo no hay cuentas: se entra derecho al contenido local. */
+  demo: boolean;
   ingresar: (email: string, password: string) => Promise<void>;
   crearCuenta: (email: string, password: string, nombre: string) => Promise<void>;
   salir: () => Promise<void>;
@@ -16,10 +19,12 @@ const AuthContext = createContext<Contexto | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(!modoDemo);
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!supabase) return;
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setCargando(false);
@@ -37,15 +42,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       session,
       cargando,
+      demo: modoDemo,
       async ingresar(email, password) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error } = await pedirSupabase().auth.signInWithPassword({
           email: email.trim(),
           password,
         });
         if (error) throw new Error(traducirError(error.message));
       },
       async crearCuenta(email, password, nombre) {
-        const { error } = await supabase.auth.signUp({
+        const { error } = await pedirSupabase().auth.signUp({
           email: email.trim(),
           password,
           options: { data: { display_name: nombre.trim() } },
@@ -53,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw new Error(traducirError(error.message));
       },
       async salir() {
-        await supabase.auth.signOut();
+        if (supabase) await supabase.auth.signOut();
         // La cache es de la sesion que se va: se descarta entera.
         queryClient.clear();
       },

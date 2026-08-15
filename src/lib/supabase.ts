@@ -1,20 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import aesjs from 'aes-js';
 import * as SecureStore from 'expo-secure-store';
 import 'react-native-get-random-values';
 import { AppState } from 'react-native';
 
 import type { Database } from '../types/database';
-
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Faltan EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_KEY. Copiá .env.example a .env y completá los valores del proyecto de Supabase.',
-  );
-}
+import { modoDemo, supabaseKey, supabaseUrl } from './config';
 
 /**
  * Almacenamiento cifrado para la sesion.
@@ -69,20 +61,37 @@ class AlmacenSeguro {
   }
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
-  auth: {
-    storage: new AlmacenSeguro(),
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+const cliente: SupabaseClient<Database> | null =
+  modoDemo || !supabaseUrl || !supabaseKey
+    ? null
+    : createClient<Database>(supabaseUrl, supabaseKey, {
+        auth: {
+          storage: new AlmacenSeguro(),
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false,
+        },
+      });
 
-// El refresh automatico solo corre con la app en primer plano.
-AppState.addEventListener('change', (estado) => {
-  if (estado === 'active') {
-    supabase.auth.startAutoRefresh();
-  } else {
-    supabase.auth.stopAutoRefresh();
+if (cliente) {
+  // El refresh automatico solo corre con la app en primer plano.
+  AppState.addEventListener('change', (estado) => {
+    if (estado === 'active') {
+      cliente.auth.startAutoRefresh();
+    } else {
+      cliente.auth.stopAutoRefresh();
+    }
+  });
+}
+
+/** Null en modo demo. Usar `pedirSupabase()` donde el cliente es obligatorio. */
+export const supabase = cliente;
+
+export function pedirSupabase(): SupabaseClient<Database> {
+  if (!cliente) {
+    throw new Error(
+      'No hay conexión con Supabase. Completá EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_KEY en .env.',
+    );
   }
-});
+  return cliente;
+}

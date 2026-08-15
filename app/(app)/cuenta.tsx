@@ -14,7 +14,7 @@ const MONEDAS = ['UYU', 'USD', 'ARS', 'EUR', 'BRL'] as const;
 
 export default function Cuenta() {
   const insets = useSafeAreaInsets();
-  const { session, salir } = useAuth();
+  const { session, salir, demo } = useAuth();
   const perfil = usePerfil();
   const actualizar = useActualizarPerfil();
   const [nombre, setNombre] = useState('');
@@ -42,8 +42,21 @@ export default function Cuenta() {
       <View>
         <Texto variante="micro">Cuenta</Texto>
         <Texto variante="titulo1">{perfil.data?.display_name || 'Sin nombre'}</Texto>
-        <Texto variante="secundario">{session?.user.email}</Texto>
+        <Texto variante="secundario">
+          {demo ? 'Datos guardados solo en este teléfono' : session?.user.email}
+        </Texto>
       </View>
+
+      {demo ? (
+        <Panel variante="tarjeta" padding={espacio[4]}>
+          <Texto variante="micro">Modo demo</Texto>
+          <Texto variante="secundario" style={styles.nota}>
+            Todavía no hay proyecto de Supabase conectado. Los movimientos viven en este
+            dispositivo y se pierden al reinstalar. Completá las claves en .env para usar
+            cuentas y sincronizar.
+          </Texto>
+        </Panel>
+      ) : null}
 
       <Panel>
         <Campo etiqueta="Nombre" value={nombre} onChangeText={setNombre} autoCapitalize="words" />
@@ -83,9 +96,11 @@ export default function Cuenta() {
         </Texto>
       </Panel>
 
-      <Boton variante="texto" onPress={salir}>
-        Cerrar sesión
-      </Boton>
+      {demo ? null : (
+        <Boton variante="texto" onPress={salir}>
+          Cerrar sesión
+        </Boton>
+      )}
     </ScrollView>
   );
 }

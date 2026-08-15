@@ -19,7 +19,6 @@ Tu plata tiene un caudal: la app solo lo hace visible.
 
 ```sh
 npm install
-cp .env.example .env        # y completar con los datos del proyecto de Supabase
 npm run fonts               # genera las instancias de Archivo (necesita python3 + fonttools)
 npm run icons               # rasteriza el isotipo a iconos y splash
 npx expo run:ios            # simulador
@@ -27,6 +26,21 @@ npm run ios:device          # iPhone por cable
 ```
 
 `NativeTabs` no funciona en Expo Go: hay que correr el dev build.
+
+### Modo demo
+
+Sin `.env` la app arranca igual, contra un almacén local en AsyncStorage sembrado con
+siete meses de movimientos de ejemplo (`src/features/datos/repoDemo.ts`). No hay cuentas
+y los datos no salen del teléfono. Sirve para ver la app funcionando antes de tener backend.
+
+Para conectar Supabase:
+
+```sh
+cp .env.example .env        # completar URL y key del proyecto
+```
+
+Las pantallas no cambian: `src/features/datos/repo.ts` elige la implementación según
+si hay credenciales.
 
 ### Base de datos
 

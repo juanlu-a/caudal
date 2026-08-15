@@ -43,21 +43,22 @@ export default function RootLayout() {
 }
 
 function Navegacion() {
-  const { session, cargando } = useAuth();
+  const { session, cargando, demo } = useAuth();
   const segmentos = useSegments();
   const router = useRouter();
 
   useEffect(() => {
     if (cargando) return;
 
+    // En modo demo no hay cuentas: se entra derecho al contenido local.
     const enAuth = segmentos[0] === '(auth)';
-    if (!session && !enAuth) {
+    if (!demo && !session && !enAuth) {
       router.replace('/ingresar');
-    } else if (session && enAuth) {
+    } else if ((demo || session) && enAuth) {
       router.replace('/');
     }
     SplashScreen.hideAsync();
-  }, [session, cargando, segmentos, router]);
+  }, [session, cargando, demo, segmentos, router]);
 
   return (
     <Stack
