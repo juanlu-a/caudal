@@ -6,6 +6,8 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
+export type TipoDeCuenta = 'bank' | 'card' | 'cash';
+
 export type Database = {
   public: {
     Tables: {
@@ -58,6 +60,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          kind: TipoDeCuenta;
+          currency: string;
+          last4: string | null;
+          archived: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          kind?: TipoDeCuenta;
+          currency?: string;
+          last4?: string | null;
+          archived?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          kind?: TipoDeCuenta;
+          currency?: string;
+          last4?: string | null;
+          archived?: boolean;
+        };
+        Relationships: [];
+      };
+      imports: {
+        Row: {
+          id: string;
+          user_id: string;
+          account_id: string | null;
+          source: string;
+          file_name: string;
+          period_start: string | null;
+          period_end: string | null;
+          rows_total: number;
+          rows_imported: number;
+          rows_skipped: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          account_id?: string | null;
+          source: string;
+          file_name?: string;
+          period_start?: string | null;
+          period_end?: string | null;
+          rows_total?: number;
+          rows_imported?: number;
+          rows_skipped?: number;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
       transactions: {
         Row: {
           id: string;
@@ -68,6 +130,12 @@ export type Database = {
           category_id: string | null;
           description: string;
           created_at: string;
+          account_id: string | null;
+          /** Plata que solo cambia de lugar: no es ni gasto ni ingreso. */
+          is_transfer: boolean;
+          import_id: string | null;
+          /** Clave de la fila del archivo, para no importar dos veces lo mismo. */
+          external_key: string | null;
         };
         Insert: {
           id?: string;
@@ -77,12 +145,18 @@ export type Database = {
           category_id?: string | null;
           description?: string;
           created_at?: string;
+          account_id?: string | null;
+          is_transfer?: boolean;
+          import_id?: string | null;
+          external_key?: string | null;
         };
         Update: {
           occurred_on?: string;
           amount?: number;
           category_id?: string | null;
           description?: string;
+          account_id?: string | null;
+          is_transfer?: boolean;
         };
         Relationships: [];
       };
@@ -100,6 +174,19 @@ export type Database = {
         };
         Relationships: [];
       };
+      account_balances: {
+        Row: {
+          user_id: string;
+          account_id: string;
+          name: string;
+          kind: TipoDeCuenta;
+          currency: string;
+          saldo: number;
+          movimientos: number;
+          ultimo_movimiento: string | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: Record<never, never>;
     Enums: Record<never, never>;
@@ -107,6 +194,9 @@ export type Database = {
   };
 };
 
+export type Cuenta = Database['public']['Tables']['accounts']['Row'];
+export type SaldoDeCuenta = Database['public']['Views']['account_balances']['Row'];
+export type Importacion = Database['public']['Tables']['imports']['Row'];
 export type Categoria = Database['public']['Tables']['categories']['Row'];
 export type Movimiento = Database['public']['Tables']['transactions']['Row'];
 export type Perfil = Database['public']['Tables']['profiles']['Row'];

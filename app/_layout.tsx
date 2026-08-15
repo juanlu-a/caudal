@@ -85,6 +85,15 @@ function Navegacion() {
           ...encabezado,
         }}
       />
+      <Stack.Screen
+        name="importar"
+        options={{
+          presentation: 'modal',
+          headerShown: true,
+          title: 'Importar del banco',
+          ...encabezado,
+        }}
+      />
     </Stack>
   );
 }

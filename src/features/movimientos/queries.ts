@@ -1,16 +1,65 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { repo, type CambiosPerfil, type NuevoMovimiento } from '../datos/repo';
+import type { PlanDeImportacion } from '../importacion/importar';
+import {
+  repo,
+  type CambiosPerfil,
+  type NuevaCuenta,
+  type NuevoMovimiento,
+  type OpcionesDeAplicacion,
+} from '../datos/repo';
 
 export type { NuevoMovimiento };
 
 export const claves = {
   perfil: ['perfil'] as const,
+  cuentas: ['cuentas'] as const,
+  saldos: ['saldos'] as const,
   categorias: ['categorias'] as const,
   movimientos: (mes?: string) => ['movimientos', mes ?? 'todos'] as const,
   movimiento: (id: string) => ['movimiento', id] as const,
   totales: ['totales'] as const,
 };
+
+export function useCuentas() {
+  return useQuery({
+    queryKey: claves.cuentas,
+    queryFn: () => repo.cuentas(),
+  });
+}
+
+export function useSaldos() {
+  return useQuery({
+    queryKey: claves.saldos,
+    queryFn: () => repo.saldos(),
+  });
+}
+
+export function useCrearCuenta() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (datos: NuevaCuenta) => repo.crearCuenta(datos),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: claves.cuentas });
+      queryClient.invalidateQueries({ queryKey: claves.saldos });
+    },
+  });
+}
+
+export function useImportar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (args: { plan: PlanDeImportacion; opciones?: OpcionesDeAplicacion }) =>
+      repo.aplicarImportacion(args.plan, args.opciones),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['movimientos'] });
+      queryClient.invalidateQueries({ queryKey: claves.totales });
+      queryClient.invalidateQueries({ queryKey: claves.saldos });
+    },
+  });
+}
 
 export function usePerfil() {
   return useQuery({

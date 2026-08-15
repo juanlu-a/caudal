@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { aFechaISO, inicioDeMes, parseFechaISO, sumarMeses } from '../../lib/format';
+import { uuid } from '../../lib/uuid';
 import type {
   Categoria,
+  Cuenta,
   MovimientoConCategoria,
   Perfil,
+  SaldoDeCuenta,
   TotalesDelMes,
 } from '../../types/database';
 import type { Repositorio } from './repo';
@@ -14,11 +17,12 @@ import type { Repositorio } from './repo';
  * Persiste en AsyncStorage: los datos no salen del telefono y se borran
  * reinstalando la app. Misma forma de datos que el repositorio remoto.
  */
-const CLAVE = 'caudal.demo.v2';
+const CLAVE = 'caudal.demo.v3';
 const USUARIO = 'demo';
 
 type Estado = {
   perfil: Perfil;
+  cuentas: Cuenta[];
   categorias: Categoria[];
   movimientos: MovimientoConCategoria[];
 };
@@ -79,6 +83,19 @@ function sembrar(): Estado {
     created_at: ahora,
   }));
 
+  const cuentas: Cuenta[] = [
+    {
+      id: id('cta', 0),
+      user_id: USUARIO,
+      name: 'Cuenta',
+      kind: 'bank',
+      currency: 'UYU',
+      last4: null,
+      archived: false,
+      created_at: ahora,
+    },
+  ];
+
   const porNombre = new Map(categorias.map((c) => [c.name, c]));
   const hoy = new Date();
 
@@ -97,6 +114,10 @@ function sembrar(): Estado {
         category_id: amount > 0 ? null : categoria.id,
         description: amount > 0 ? 'Sueldo' : descripcionDe(nombre),
         created_at: fecha.toISOString(),
+        account_id: cuentas[0].id,
+        is_transfer: false,
+        import_id: null,
+        external_key: null,
         categories:
           amount > 0
             ? null
@@ -117,6 +138,7 @@ function sembrar(): Estado {
       currency: 'UYU',
       created_at: ahora,
     },
+    cuentas,
     categorias,
     movimientos,
   };
@@ -167,6 +189,105 @@ export const repositorio: Repositorio = {
     await guardar({ ...estado, perfil: { ...estado.perfil, ...cambios } });
   },
 
+  async cuentas() {
+    return (await leer()).cuentas.filter((c) => !c.archived);
+  },
+
+  async crearCuenta(datos) {
+    const estado = await leer();
+    const cuenta: Cuenta = {
+      id: uuid(),
+      user_id: USUARIO,
+      name: datos.name,
+      kind: datos.kind,
+      currency: datos.currency ?? estado.perfil.currency,
+      last4: datos.last4 ?? null,
+      archived: false,
+      created_at: new Date().toISOString(),
+    };
+    await guardar({ ...estado, cuentas: [...estado.cuentas, cuenta] });
+    return cuenta;
+  },
+
+  async saldos() {
+    const estado = await leer();
+    return estado.cuentas
+      .filter((c) => !c.archived)
+      .map((cuenta): SaldoDeCuenta => {
+        const suyos = estado.movimientos.filter((m) => m.account_id === cuenta.id);
+        return {
+          user_id: USUARIO,
+          account_id: cuenta.id,
+          name: cuenta.name,
+          kind: cuenta.kind,
+          currency: cuenta.currency,
+          // El saldo de una cuenta sí incluye las transferencias: la plata se movió.
+          saldo: suyos.reduce((suma, m) => suma + Number(m.amount), 0),
+          movimientos: suyos.length,
+          ultimo_movimiento: suyos.map((m) => m.occurred_on).sort().at(-1) ?? null,
+        };
+      });
+  },
+
+  async clavesExistentes(claves) {
+    const estado = await leer();
+    const todas = new Set(
+      estado.movimientos.map((m) => m.external_key).filter((k): k is string => !!k),
+    );
+    return new Set(claves.filter((c) => todas.has(c)));
+  },
+
+  async aplicarImportacion(plan, opciones = {}) {
+    const estado = await leer();
+    const nuevos = plan.movimientos.filter((m) => !m.duplicado);
+    // En el resumen de la tarjeta el pago recibido siempre es transferencia:
+    // nadie gana plata con su tarjeta.
+    const comoTransferencia =
+      plan.origen === 'tarjeta' || opciones.pagosDeTarjetaComoTransferencia === true;
+
+    const yaEstan = new Set(
+      estado.movimientos.map((m) => m.external_key).filter((k): k is string => !!k),
+    );
+
+    const importId = uuid();
+    const agregados: MovimientoConCategoria[] = [];
+    let transferencias = 0;
+
+    for (const movimiento of nuevos) {
+      if (yaEstan.has(movimiento.clave)) continue;
+      yaEstan.add(movimiento.clave);
+
+      const categoria = estado.categorias.find((c) => c.id === movimiento.categoriaId) ?? null;
+      const esTransferencia = movimiento.pagoDeTarjeta && comoTransferencia;
+      if (esTransferencia) transferencias++;
+
+      agregados.push({
+        id: uuid(),
+        user_id: USUARIO,
+        occurred_on: movimiento.fila.fecha,
+        amount: movimiento.fila.monto,
+        category_id: categoria?.id ?? null,
+        description: movimiento.fila.descripcion,
+        created_at: new Date().toISOString(),
+        account_id: plan.cuentaId,
+        is_transfer: esTransferencia,
+        import_id: importId,
+        external_key: movimiento.clave,
+        categories: categoria
+          ? {
+              id: categoria.id,
+              name: categoria.name,
+              icon_key: categoria.icon_key,
+              color_index: categoria.color_index,
+            }
+          : null,
+      });
+    }
+
+    await guardar({ ...estado, movimientos: [...agregados, ...estado.movimientos] });
+    return { importados: agregados.length, omitidos: plan.duplicados, transferencias };
+  },
+
   async categorias() {
     return (await leer()).categorias.filter((c) => !c.archived);
   },
@@ -191,6 +312,8 @@ export const repositorio: Repositorio = {
     const acumulado = new Map<string, TotalesDelMes>();
 
     for (const m of estado.movimientos) {
+      // Mover plata de una cuenta a otra no es ni ingreso ni gasto.
+      if (m.is_transfer) continue;
       const mes = inicioDeMes(parseFechaISO(m.occurred_on));
       const actual =
         acumulado.get(mes) ??
@@ -237,6 +360,10 @@ export const repositorio: Repositorio = {
       category_id: categoria?.id ?? null,
       description: nuevo.description,
       created_at: new Date().toISOString(),
+      account_id: nuevo.account_id ?? estado.cuentas[0]?.id ?? null,
+      is_transfer: false,
+      import_id: null,
+      external_key: null,
       categories: categoria
         ? {
             id: categoria.id,

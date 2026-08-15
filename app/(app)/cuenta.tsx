@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +8,8 @@ import { Campo } from '../../src/components/Campo';
 import { Panel } from '../../src/components/Panel';
 import { Texto } from '../../src/components/Texto';
 import { useAuth } from '../../src/features/auth/AuthProvider';
-import { useActualizarPerfil, usePerfil } from '../../src/features/movimientos/queries';
+import { useActualizarPerfil, usePerfil, useSaldos } from '../../src/features/movimientos/queries';
+import { formatMoneda } from '../../src/lib/format';
 import { color, espacio, margenPantalla, radio } from '../../src/theme';
 
 const MONEDAS = ['UYU', 'USD', 'ARS', 'EUR', 'BRL'] as const;
@@ -15,7 +17,9 @@ const MONEDAS = ['UYU', 'USD', 'ARS', 'EUR', 'BRL'] as const;
 export default function Cuenta() {
   const insets = useSafeAreaInsets();
   const { session, salir, demo } = useAuth();
+  const router = useRouter();
   const perfil = usePerfil();
+  const saldos = useSaldos();
   const actualizar = useActualizarPerfil();
   const [nombre, setNombre] = useState('');
   const [guardado, setGuardado] = useState(false);
@@ -59,6 +63,25 @@ export default function Cuenta() {
           </Texto>
         </Panel>
       ) : null}
+
+      <Panel>
+        <Texto variante="micro">Cuentas</Texto>
+        <View style={styles.saldos}>
+          {(saldos.data ?? []).map((s) => (
+            <View key={s.account_id} style={styles.saldo}>
+              <Texto variante="etiqueta">{s.name}</Texto>
+              <Texto variante="cifraLista" style={styles.saldoCifra}>
+                {formatMoneda(s.saldo, s.currency, { decimales: 'ocultarEnCero' })}
+              </Texto>
+            </View>
+          ))}
+        </View>
+        <View style={styles.accion}>
+          <Boton variante="secundario" ancho="contenido" onPress={() => router.push('/importar')}>
+            Importar del banco
+          </Boton>
+        </View>
+      </Panel>
 
       <Panel>
         <Campo etiqueta="Nombre" value={nombre} onChangeText={setNombre} autoCapitalize="words" />
@@ -118,6 +141,19 @@ const styles = StyleSheet.create({
   },
   accion: {
     marginTop: espacio[4],
+  },
+  saldos: {
+    gap: espacio[3],
+    marginTop: espacio[3],
+  },
+  saldo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: espacio[4],
+  },
+  saldoCifra: {
+    textAlign: 'right',
   },
   monedas: {
     flexDirection: 'row',
