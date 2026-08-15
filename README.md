@@ -52,6 +52,38 @@ supabase db push
 El trigger `on_auth_user_created` siembra el perfil y ocho categorías con su color
 de la rampa cuando alguien crea la cuenta.
 
+## Importar del banco
+
+Cuenta → **Importar del banco**. Se elige qué es el archivo (estado de cuenta o resumen
+de tarjeta), a qué cuenta va, y se trae el Excel o CSV tal cual lo baja el banco.
+
+El parser (`src/features/importacion/`) busca el encabezado aunque haya filas de título
+arriba, entiende columnas de débito/crédito o una sola de importe con signo, y fechas
+en `dd/mm/aaaa`, serie de Excel o `Date`.
+
+### La tarjeta de crédito
+
+Si cargás el estado de cuenta **y** el resumen de la tarjeta, la misma plata aparece dos
+veces: como el pago de la tarjeta y como las compras que lo componen. Por eso cada
+movimiento pertenece a una cuenta y el pago se marca `is_transfer`:
+
+```
+saldo de una cuenta = todos sus movimientos, transferencias incluidas
+gasto del mes       = movimientos negativos que NO son transferencia
+```
+
+Así el saldo del banco baja cuando pagás la tarjeta, el gasto queda en el mes en que
+compraste, y nada se cuenta dos veces. **Si no llevás el resumen de la tarjeta**, el pago
+sí cuenta como gasto: es el único rastro que queda. Eso se elige con el interruptor de
+la pantalla de importación.
+
+No se inventa la contrapartida del pago — cada pata sale de una fila real de un archivo.
+Inventarla haría que al importar el resumen el mismo pago entrara dos veces.
+
+Reimportar el mismo archivo no duplica nada: cada fila tiene una clave estable
+(cuenta, fecha, importe, descripción y orden entre filas idénticas) con índice único en
+la base, así que dos cafés iguales del mismo día sí son dos gastos.
+
 ## Firma en el iPhone
 
 Está firmada con el Apple ID personal (team `Juan Abreu`, `VPNXQ8K2P8`), que es gratis
