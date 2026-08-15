@@ -1,0 +1,189 @@
+import { useRouter } from 'expo-router';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { BotonFlotante } from '../../src/components/BotonFlotante';
+import { Cifra } from '../../src/components/Cifra';
+import { EstadoVacio } from '../../src/components/EstadoVacio';
+import { FilaMovimiento } from '../../src/components/FilaMovimiento';
+import { GraficoBarras } from '../../src/components/GraficoBarras';
+import { Isotipo } from '../../src/components/Isotipo';
+import { Panel } from '../../src/components/Panel';
+import { Texto } from '../../src/components/Texto';
+import {
+  useMovimientos,
+  usePerfil,
+  useTotales,
+} from '../../src/features/movimientos/queries';
+import {
+  abreviaturaMes,
+  formatMes,
+  formatVariacion,
+  inicioDeMes,
+  parseFechaISO,
+} from '../../src/lib/format';
+import { color, espacio, margenPantalla } from '../../src/theme';
+
+export default function Mes() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const mesActual = inicioDeMes(new Date());
+
+  const perfil = usePerfil();
+  const totales = useTotales(7);
+  const movimientos = useMovimientos(mesActual);
+
+  const moneda = perfil.data?.currency ?? 'UYU';
+  const serie = totales.data ?? [];
+  const esteMes = serie.at(-1);
+  const mesPasado = serie.at(-2);
+
+  // Variacion del saldo contra el mes anterior. Si no hay con que comparar, no se muestra:
+  // un porcentaje inventado es peor que ninguno.
+  const variacion =
+    esteMes && mesPasado && Math.abs(mesPasado.saldo) > 0
+      ? (esteMes.saldo - mesPasado.saldo) / Math.abs(mesPasado.saldo)
+      : null;
+
+  const ultimos = (movimientos.data ?? []).slice(0, 5);
+  const recargando = totales.isRefetching || movimientos.isRefetching;
+
+  return (
+    <View style={styles.pantalla}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.contenido,
+          { paddingTop: insets.top + espacio[4], paddingBottom: espacio[18] },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={recargando}
+            onRefresh={() => {
+              totales.refetch();
+              movimientos.refetch();
+            }}
+            tintColor={color.textoTerciario}
+          />
+        }>
+        <View style={styles.encabezado}>
+          <Isotipo tamano={28} />
+          <Texto variante="micro">{formatMes(new Date())}</Texto>
+        </View>
+
+        <Panel>
+          <Cifra
+            etiqueta="Saldo del mes"
+            valor={esteMes?.saldo ?? 0}
+            moneda={moneda}
+            decimales="ocultarEnCero"
+            pie={
+              variacion != null ? (
+                <Texto
+                  variante="dato"
+                  color={variacion >= 0 ? color.ingreso : color.textoTerciario}>
+                  {formatVariacion(variacion)} vs el mes pasado
+                </Texto>
+              ) : null
+            }
+          />
+          <View style={styles.desglose}>
+            <View style={styles.columna}>
+              <Texto variante="micro">Ingresos</Texto>
+              <Cifra
+                valor={esteMes?.ingresos ?? 0}
+                moneda={moneda}
+                variante="titulo1"
+                decimales="ocultarEnCero"
+              />
+            </View>
+            <View style={styles.columna}>
+              <Texto variante="micro">Gastos</Texto>
+              <Cifra
+                valor={esteMes?.gastos ?? 0}
+                moneda={moneda}
+                variante="titulo1"
+                tono="neutro"
+                decimales="ocultarEnCero"
+              />
+            </View>
+          </View>
+        </Panel>
+
+        {serie.some((m) => m.gastos > 0) ? (
+          <Panel>
+            <Texto variante="micro" style={styles.tituloBloque}>
+              Gasto por mes
+            </Texto>
+            <GraficoBarras
+              datos={serie.map((m, i) => ({
+                etiqueta: i === serie.length - 1 ? 'HOY' : abreviaturaMes(parseFechaISO(m.month)),
+                valor: m.gastos,
+                destacado: i === serie.length - 1,
+              }))}
+            />
+          </Panel>
+        ) : null}
+
+        <View>
+          <Texto variante="micro" style={styles.tituloBloque}>
+            Últimos movimientos
+          </Texto>
+          {ultimos.length === 0 && !movimientos.isLoading ? (
+            <EstadoVacio
+              titulo="Todavía no hay movimientos"
+              detalle="Agregá el primero y el saldo del mes empieza a moverse."
+            />
+          ) : (
+            <View style={styles.lista}>
+              {ultimos.map((m) => (
+                <FilaMovimiento key={m.id} movimiento={m} />
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <View style={[styles.flotante, { bottom: insets.bottom + espacio[18] }]}>
+        <BotonFlotante onPress={() => router.push('/nuevo')}>Agregar</BotonFlotante>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  pantalla: {
+    flex: 1,
+    backgroundColor: color.fondo,
+  },
+  contenido: {
+    paddingHorizontal: margenPantalla,
+    gap: espacio[6],
+  },
+  encabezado: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  desglose: {
+    flexDirection: 'row',
+    gap: espacio[6],
+    marginTop: espacio[6],
+  },
+  columna: {
+    flex: 1,
+    gap: espacio[1],
+  },
+  tituloBloque: {
+    marginBottom: espacio[3],
+  },
+  lista: {
+    gap: espacio[1],
+  },
+  flotante: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+});
