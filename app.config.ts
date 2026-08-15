@@ -40,6 +40,8 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-secure-store',
+    // Apple ID personal gratis: firma para el iPhone propio, con 7 días de vida.
+    ['./plugins/withEquipoDeFirma', { teamId: 'VPNXQ8K2P8' }],
     [
       'expo-font',
       {

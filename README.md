@@ -54,12 +54,20 @@ de la rampa cuando alguien crea la cuenta.
 
 ## Firma en el iPhone
 
-Está firmada con el Apple ID personal (team `Juan Abreu`), que es gratis pero da
-**7 días de vida** al build. Cuando la app deje de abrir, se enchufa el cable y:
+Está firmada con el Apple ID personal (team `Juan Abreu`, `VPNXQ8K2P8`), que es gratis
+pero da **7 días de vida** al build. El equipo de firma queda fijado por
+`plugins/withEquipoDeFirma.js`, así que sobrevive a cada `expo prebuild`.
 
-```sh
-npm run ios:device
-```
+La primera vez:
+
+1. Xcode → Settings (⌘,) → Accounts → **+** → Apple ID, e iniciar sesión.
+   Sin esto el build falla con «No Accounts: Add a new account in Accounts settings».
+2. Enchufar el iPhone y desbloquearlo.
+3. `npm run ios:device`
+4. En el teléfono: Ajustes → General → VPN y gestión de dispositivos → confiar en el
+   desarrollador.
+
+Después, cuando la app deje de abrir a los 7 días, alcanza con repetir el paso 3.
 
 Para pasar a TestFlight hace falta la cuenta paga de Apple Developer (US$ 99/año)
 y agregar `eas.json`; el código no cambia.
