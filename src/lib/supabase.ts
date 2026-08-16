@@ -69,7 +69,10 @@ const cliente: SupabaseClient<Database> | null =
           storage: new AlmacenSeguro(),
           autoRefreshToken: true,
           persistSession: true,
+          // En un teléfono no hay URL de la que sacar la sesión: el link del mail
+          // llega como deep link y lo canjea AuthProvider a mano.
           detectSessionInUrl: false,
+          flowType: 'pkce',
         },
       });
 

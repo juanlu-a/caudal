@@ -1,9 +1,13 @@
 import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Linking from 'expo-linking';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import { modoDemo } from '../../lib/config';
 import { pedirSupabase, supabase } from '../../lib/supabase';
+
+/** A dónde vuelve el link del mail de confirmación: a la app, no al navegador. */
+const VOLVER_A_LA_APP = Linking.createURL('/confirmado');
 
 type Contexto = {
   session: Session | null;
@@ -11,7 +15,8 @@ type Contexto = {
   /** En modo demo no hay cuentas: se entra derecho al contenido local. */
   demo: boolean;
   ingresar: (email: string, password: string) => Promise<void>;
-  crearCuenta: (email: string, password: string, nombre: string) => Promise<void>;
+  /** Devuelve true cuando quedó pendiente confirmar el mail. */
+  crearCuenta: (email: string, password: string, nombre: string) => Promise<boolean>;
   salir: () => Promise<void>;
 };
 
@@ -38,6 +43,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // El link del mail de confirmación abre la app con un código: se canjea por la
+  // sesión. Sirve tanto si la app estaba cerrada como si estaba abierta.
+  useEffect(() => {
+    if (!supabase) return;
+
+    async function canjear(url: string | null) {
+      if (!url || !supabase) return;
+      const { queryParams } = Linking.parse(url);
+      const codigo = typeof queryParams?.code === 'string' ? queryParams.code : null;
+      if (!codigo) return;
+
+      const { error } = await supabase.auth.exchangeCodeForSession(codigo);
+      if (error) console.warn('[auth] no se pudo canjear el código del mail:', error.message);
+    }
+
+    Linking.getInitialURL().then(canjear);
+    const sub = Linking.addEventListener('url', ({ url }) => canjear(url));
+    return () => sub.remove();
+  }, []);
+
   const valor = useMemo<Contexto>(
     () => ({
       session,
@@ -51,12 +76,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw new Error(traducirError(error.message));
       },
       async crearCuenta(email, password, nombre) {
-        const { error } = await pedirSupabase().auth.signUp({
+        const { data, error } = await pedirSupabase().auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { display_name: nombre.trim() } },
+          options: {
+            data: { display_name: nombre.trim() },
+            emailRedirectTo: VOLVER_A_LA_APP,
+          },
         });
         if (error) throw new Error(traducirError(error.message));
+        // Con la confirmación de mail activada no hay sesión hasta que se abre
+        // el link: la pantalla tiene que decirlo en vez de quedarse quieta.
+        return data.session == null;
       },
       async salir() {
         if (supabase) await supabase.auth.signOut();

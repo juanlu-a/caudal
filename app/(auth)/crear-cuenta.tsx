@@ -18,6 +18,7 @@ export default function CrearCuenta() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [faltaConfirmar, setFaltaConfirmar] = useState(false);
 
   const completo = email.trim().length > 0 && password.length >= 6;
 
@@ -26,7 +27,7 @@ export default function CrearCuenta() {
     setCargando(true);
     setError(null);
     try {
-      await crearCuenta(email, password, nombre);
+      setFaltaConfirmar(await crearCuenta(email, password, nombre));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo crear la cuenta. Probá de nuevo.');
     } finally {
@@ -46,12 +47,17 @@ export default function CrearCuenta() {
         keyboardShouldPersistTaps="handled">
         <View style={styles.marca}>
           <Isotipo tamano={48} />
-          <Texto variante="titulo1">Crear cuenta</Texto>
+          <Texto variante="titulo1">
+            {faltaConfirmar ? 'Revisá tu mail' : 'Crear cuenta'}
+          </Texto>
           <Texto variante="secundario">
-            Con el mail y una contraseña alcanza. Después cargás el primer movimiento.
+            {faltaConfirmar
+              ? `Te mandamos un link a ${email.trim()}. Abrilo desde este teléfono y la app te deja entrar.`
+              : 'Con el mail y una contraseña alcanza. Después cargás el primer movimiento.'}
           </Texto>
         </View>
 
+        {faltaConfirmar ? null : (
         <View style={styles.formulario}>
           <Campo
             etiqueta="Nombre"
@@ -86,6 +92,7 @@ export default function CrearCuenta() {
             Crear cuenta
           </Boton>
         </View>
+        )}
 
         <View style={styles.pie}>
           <Texto variante="secundario">¿Ya tenés cuenta?</Texto>
