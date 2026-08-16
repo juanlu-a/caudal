@@ -1,5 +1,5 @@
 import type { Categoria } from '../../types/database';
-import type { FilaImportada, OrigenDeArchivo, ResultadoDeLectura } from './tipos';
+import type { FilaImportada, Lectura, OrigenDeArchivo, SeccionImportable } from './tipos';
 import { normalizar } from './valores';
 
 /**
@@ -21,11 +21,16 @@ export type PlanDeImportacion = {
   cuentaId: string;
   desde: string | null;
   hasta: string | null;
-  moneda: string | null;
+  moneda: string;
   movimientos: MovimientoPlaneado[];
   nuevos: number;
   duplicados: number;
   pagosDeTarjeta: number;
+  /**
+   * Diferencia entre la suma de los movimientos leídos y el saldo que informa el
+   * banco. Cero es la confirmación de que se leyó el archivo entero y bien.
+   */
+  descuadre: number | null;
   avisos: string[];
 };
 
@@ -80,7 +85,8 @@ export function claveDeFila(cuentaId: string, fila: FilaImportada, repeticion: n
 }
 
 export function planificar(
-  lectura: ResultadoDeLectura,
+  lectura: Lectura,
+  seccion: SeccionImportable,
   opciones: {
     cuentaId: string;
     archivo: string;
@@ -92,7 +98,7 @@ export function planificar(
   const { cuentaId, archivo, categorias, clavesExistentes } = opciones;
 
   const vistas = new Map<string, number>();
-  const movimientos: MovimientoPlaneado[] = lectura.filas.map((fila) => {
+  const movimientos: MovimientoPlaneado[] = seccion.filas.map((fila) => {
     const base = claveDeFila(cuentaId, fila, 0);
     const repeticion = vistas.get(base) ?? 0;
     vistas.set(base, repeticion + 1);
@@ -114,6 +120,11 @@ export function planificar(
   const pagosDeTarjeta = movimientos.filter((m) => m.pagoDeTarjeta && !m.duplicado).length;
 
   const avisos = [...lectura.avisos];
+  if (seccion.descuadre != null && seccion.descuadre !== 0) {
+    avisos.push(
+      `La suma de los movimientos no da el saldo que informa el banco: hay una diferencia de ${Math.abs(seccion.descuadre).toFixed(2)}. Revisá antes de importar.`,
+    );
+  }
   if (duplicados > 0) {
     avisos.push(
       `Se omiten ${duplicados} ${duplicados === 1 ? 'movimiento ya registrado' : 'movimientos ya registrados'}.`,
@@ -126,11 +137,12 @@ export function planificar(
     cuentaId,
     desde: lectura.desde,
     hasta: lectura.hasta,
-    moneda: lectura.moneda,
+    moneda: seccion.moneda,
     movimientos,
     nuevos: movimientos.length - duplicados,
     duplicados,
     pagosDeTarjeta,
+    descuadre: seccion.descuadre,
     avisos,
   };
 }

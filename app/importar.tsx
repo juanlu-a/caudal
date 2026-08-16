@@ -10,7 +10,7 @@ import { Texto } from '../src/components/Texto';
 import { ZonaDeArchivo } from '../src/components/ZonaDeArchivo';
 import { repo } from '../src/features/datos/repo';
 import { planificar, type PlanDeImportacion } from '../src/features/importacion/importar';
-import { elegirArchivo, leerPlanilla } from '../src/features/importacion/planilla';
+import { elegirArchivo, leerArchivo } from '../src/features/importacion/archivo';
 import { ErrorDeArchivo, type OrigenDeArchivo } from '../src/features/importacion/tipos';
 import {
   useCategorias,
@@ -53,11 +53,24 @@ export default function Importar() {
       const archivo = await elegirArchivo();
       if (!archivo) return;
 
-      const lectura = leerPlanilla(archivo.base64, {
+      const lectura = await leerArchivo(archivo, {
         origen,
         monedaPorDefecto: cuentaElegida.currency,
       });
-      const preliminar = planificar(lectura, {
+
+      // Un archivo puede traer pesos y dólares: se importa la sección de la
+      // moneda de la cuenta elegida.
+      const seccion =
+        lectura.secciones.find((s) => s.moneda === cuentaElegida.currency) ?? lectura.secciones[0];
+
+      if (seccion.moneda !== cuentaElegida.currency) {
+        setError(
+          `El archivo trae movimientos en ${seccion.moneda} y la cuenta «${cuentaElegida.name}» es en ${cuentaElegida.currency}. Elegí una cuenta en ${seccion.moneda} o creala.`,
+        );
+        return;
+      }
+
+      const preliminar = planificar(lectura, seccion, {
         cuentaId: cuentaElegida.id,
         archivo: archivo.nombre,
         categorias: categorias.data ?? [],
@@ -67,7 +80,7 @@ export default function Importar() {
       // Recién ahora se le pregunta a la base cuáles ya estaban.
       const existentes = await repo.clavesExistentes(preliminar.movimientos.map((m) => m.clave));
       setPlan(
-        planificar(lectura, {
+        planificar(lectura, seccion, {
           cuentaId: cuentaElegida.id,
           archivo: archivo.nombre,
           categorias: categorias.data ?? [],
@@ -272,6 +285,12 @@ function Vista({
           <Dato etiqueta="Ya estaban" valor={String(plan.duplicados)} />
           <Dato etiqueta="Pagos de tarjeta" valor={String(plan.pagosDeTarjeta)} />
         </View>
+
+        {plan.descuadre === 0 ? (
+          <Texto variante="dato" color={color.acento} style={styles.cuadre}>
+            La suma de los movimientos da el saldo que informa el banco.
+          </Texto>
+        ) : null}
       </Panel>
 
       {plan.avisos.length > 0 ? (
@@ -457,6 +476,9 @@ const styles = StyleSheet.create({
   },
   nota: {
     marginTop: espacio[3],
+  },
+  cuadre: {
+    marginTop: espacio[5],
   },
   acciones: {
     gap: espacio[3],

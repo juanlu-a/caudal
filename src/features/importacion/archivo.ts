@@ -1,0 +1,126 @@
+import { File } from 'expo-file-system';
+import * as XLSX from 'xlsx';
+
+import { leerEstadoDeCuenta, leerResumenDeTarjeta } from './itau';
+import { leerPdf } from './pdf';
+import { interpretar, type Matriz } from './parser';
+import { ErrorDeArchivo, type Lectura, type OrigenDeArchivo } from './tipos';
+
+export type ArchivoElegido = {
+  nombre: string;
+  bytes: Uint8Array;
+};
+
+/** Lo que deja elegir el selector del sistema. */
+const TIPOS = [
+  'com.adobe.pdf',
+  'com.microsoft.excel.xls',
+  'org.openxmlformats.spreadsheetml.sheet',
+  'public.comma-separated-values-text',
+];
+
+/**
+ * Abre el selector de archivos del sistema. En iOS devuelve una copia temporal,
+ * así que el original del banco queda intacto.
+ */
+export async function elegirArchivo(): Promise<ArchivoElegido | null> {
+  const { result, canceled } = await File.pickFileAsync({ mimeTypes: TIPOS });
+  if (canceled || !result) return null;
+
+  return { nombre: result.name, bytes: await result.bytes() };
+}
+
+export type OpcionesDeArchivo = {
+  origen: OrigenDeArchivo;
+  monedaPorDefecto?: string;
+};
+
+/**
+ * Lee el archivo del banco, sea el PDF del estado de cuenta o una planilla.
+ * Todo pasa acá: la pantalla no necesita saber de qué formato se trata.
+ *
+ * El PDF es el formato preferido porque trae los saldos: al reconstruirlo se
+ * controla que la suma de los movimientos dé exactamente el saldo que informa el
+ * banco, y si no da, se avisa en vez de importar cifras mal leídas.
+ */
+export async function leerArchivo(
+  archivo: ArchivoElegido,
+  opciones: OpcionesDeArchivo,
+): Promise<Lectura> {
+  const esPdf =
+    /\.pdf$/i.test(archivo.nombre) ||
+    (archivo.bytes[0] === 0x25 && archivo.bytes[1] === 0x50); // «%P» de %PDF
+
+  if (esPdf) {
+    const lineas = await leerPdf(archivo.bytes);
+    return opciones.origen === 'tarjeta'
+      ? leerResumenDeTarjeta(lineas)
+      : leerEstadoDeCuenta(lineas);
+  }
+
+  return leerPlanilla(archivo.bytes, opciones);
+}
+
+/** Cada hoja del libro como matriz de celdas. */
+function hojasDe(bytes: Uint8Array): { nombre: string; matriz: Matriz }[] {
+  let libro: XLSX.WorkBook;
+  try {
+    libro = XLSX.read(bytes, { type: 'array', cellDates: true, raw: false });
+  } catch {
+    throw new ErrorDeArchivo(
+      'No se pudo abrir el archivo. Tiene que ser el PDF o la planilla que descargás del banco, sin editar.',
+    );
+  }
+
+  return libro.SheetNames.map((nombre) => ({
+    nombre,
+    matriz: XLSX.utils.sheet_to_json<unknown[]>(libro.Sheets[nombre], {
+      header: 1,
+      raw: true,
+      defval: '',
+      blankrows: false,
+    }),
+  }));
+}
+
+/**
+ * Planillas. Prueba hoja por hoja y se queda con la primera que tenga una tabla
+ * de movimientos reconocible: los extractos suelen traer una portada antes.
+ */
+function leerPlanilla(bytes: Uint8Array, opciones: OpcionesDeArchivo): Lectura {
+  const hojas = hojasDe(bytes);
+  if (hojas.length === 0) throw new ErrorDeArchivo('El archivo no tiene ninguna hoja con datos.');
+
+  let ultimoError: ErrorDeArchivo | null = null;
+
+  for (const hoja of hojas) {
+    try {
+      const resultado = interpretar(hoja.matriz, opciones);
+      const avisos = [...resultado.avisos];
+      if (hojas.length > 1) avisos.push(`Se leyó la hoja «${hoja.nombre}».`);
+
+      return {
+        origen: resultado.origen,
+        desde: resultado.desde,
+        hasta: resultado.hasta,
+        avisos,
+        secciones: [
+          {
+            moneda: resultado.moneda ?? opciones.monedaPorDefecto ?? 'UYU',
+            identificador: null,
+            filas: resultado.filas,
+            // Una planilla no trae saldos con que controlar la lectura.
+            apertura: null,
+            cierre: null,
+            descuadre: null,
+          },
+        ],
+      };
+    } catch (e) {
+      if (e instanceof ErrorDeArchivo) ultimoError = e;
+      else throw e;
+    }
+  }
+
+  throw ultimoError ?? new ErrorDeArchivo('El archivo no tiene columnas de fecha e importe.');
+}

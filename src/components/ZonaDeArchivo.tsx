@@ -51,7 +51,7 @@ export function ZonaDeArchivo({ onPress, leyendo = false, archivo }: Props) {
         </Texto>
         {leyendo ? null : (
           <Texto variante="secundario" style={styles.centrado}>
-            El Excel o el CSV tal cual lo descargás, sin editar.
+            El PDF que descargás del banco, sin editar. También lee Excel y CSV.
           </Texto>
         )}
       </View>
