@@ -4,9 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Boton } from '../../src/components/Boton';
 import { Campo } from '../../src/components/Campo';
+import { Desplegable } from '../../src/components/Desplegable';
 import { Panel } from '../../src/components/Panel';
 import { Texto } from '../../src/components/Texto';
 import { useAuth } from '../../src/features/auth/AuthProvider';
+import { BANCOS, BANCO_POR_DEFECTO } from '../../src/features/importacion/bancos';
 import { useActualizarPerfil, usePerfil, useSaldos } from '../../src/features/movimientos/queries';
 import { formatMoneda } from '../../src/lib/format';
 import { color, espacio, margenPantalla, radio } from '../../src/theme';
@@ -27,6 +29,7 @@ export default function Cuenta() {
   }, [perfil.data?.display_name]);
 
   const moneda = perfil.data?.currency ?? 'UYU';
+  const banco = perfil.data?.bank ?? BANCO_POR_DEFECTO;
 
   async function guardarNombre() {
     await actualizar.mutateAsync({ display_name: nombre.trim() });
@@ -74,6 +77,26 @@ export default function Cuenta() {
             </View>
           ))}
         </View>
+      </Panel>
+
+      <Panel>
+        <Texto variante="micro">Banco</Texto>
+        <View style={styles.nota}>
+          <Desplegable
+            opciones={BANCOS.map((b) => ({
+              id: b.id,
+              nombre: b.nombre,
+              deshabilitada: !b.soportado,
+              nota: b.soportado ? undefined : 'Todavía no',
+            }))}
+            valor={banco}
+            onElegir={(id) => actualizar.mutate({ bank: id })}
+          />
+        </View>
+        <Texto variante="secundario" style={styles.nota}>
+          De esto depende cómo se leen los archivos al importar. Por ahora solo sabemos leer los
+          de Itaú.
+        </Texto>
       </Panel>
 
       <Panel>

@@ -1,8 +1,9 @@
 import { File } from 'expo-file-system';
 import * as XLSX from 'xlsx';
 
+import { buscarBanco, type IdDeBanco } from './bancos';
 import { leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta } from './itau';
-import { leerPdf } from './pdf';
+import { leerPdf, type LineaDePdf } from './pdf';
 import { interpretar, type Matriz } from './parser';
 import { ErrorDeArchivo, type Lectura, type OrigenDeArchivo } from './tipos';
 
@@ -34,6 +35,13 @@ export type OpcionesDeArchivo = {
   /** Si no se dice qué es el archivo, se deduce del contenido. */
   origen?: OrigenDeArchivo;
   monedaPorDefecto?: string;
+  /** Con qué banco opera la persona. Define qué lectores se prueban. */
+  banco?: IdDeBanco;
+};
+
+/** Los lectores de cada banco, en orden de exigencia. */
+const LECTORES: Partial<Record<IdDeBanco, ((lineas: LineaDePdf[]) => Lectura)[]>> = {
+  itau: [leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta],
 };
 
 /**
@@ -57,9 +65,17 @@ export async function leerArchivo(
     if (opciones.origen === 'tarjeta') return leerResumenDeTarjeta(lineas);
     if (opciones.origen === 'cuenta') return leerEstadoDeCuenta(lineas);
 
-    // Sin decir qué es, se prueban los lectores en orden de exigencia: cada uno
-    // pide marcas propias, así que el que reconoce el archivo es el correcto.
-    for (const leer of [leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta]) {
+    const banco = buscarBanco(opciones.banco);
+    const lectores = LECTORES[banco.id];
+    if (!lectores) {
+      throw new ErrorDeArchivo(
+        `Todavía no sabemos leer los archivos de ${banco.nombre}. Cambiá el banco en Ajustes o cargá los movimientos a mano.`,
+      );
+    }
+
+    // Cada lector pide marcas propias, así que el que reconoce el archivo es el
+    // correcto: no hace falta decir de antemano qué documento es.
+    for (const leer of lectores) {
       try {
         return leer(lineas);
       } catch (e) {
@@ -68,7 +84,7 @@ export async function leerArchivo(
     }
 
     throw new ErrorDeArchivo(
-      'No se reconoce el PDF. Tiene que ser el estado de cuenta, el resumen de tarjeta o la consulta de Itaú Link, tal cual los descargás.',
+      `No se reconoce el PDF como un archivo de ${banco.nombre}. Tiene que ser el que descargás del banco, sin editar.`,
     );
   }
 

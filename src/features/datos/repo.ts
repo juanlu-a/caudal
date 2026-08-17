@@ -25,6 +25,7 @@ export type NuevoMovimiento = {
 export type CambiosPerfil = {
   display_name?: string;
   currency?: string;
+  bank?: string;
 };
 
 export type NuevaCuenta = {

@@ -16,17 +16,21 @@ export type Database = {
           id: string;
           display_name: string | null;
           currency: string;
+          /** Con qué banco opera: define qué lectores usa la importación. */
+          bank: string;
           created_at: string;
         };
         Insert: {
           id: string;
           display_name?: string | null;
           currency?: string;
+          bank?: string;
           created_at?: string;
         };
         Update: {
           display_name?: string | null;
           currency?: string;
+          bank?: string;
         };
         Relationships: [];
       };

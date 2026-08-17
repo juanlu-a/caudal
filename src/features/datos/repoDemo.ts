@@ -136,6 +136,7 @@ function sembrar(): Estado {
       id: USUARIO,
       display_name: 'Invitado',
       currency: 'UYU',
+      bank: 'itau',
       created_at: ahora,
     },
     cuentas,

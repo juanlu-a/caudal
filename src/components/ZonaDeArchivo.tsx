@@ -8,6 +8,8 @@ type Props = {
   onPress: () => void;
   leyendo?: boolean;
   archivo?: string | null;
+  /** Qué archivos acepta el banco elegido. */
+  detalle?: string;
 };
 
 /**
@@ -15,7 +17,7 @@ type Props = {
  * Se dibuja con el lenguaje del isotipo — dos trazos redondos, un solo detalle
  * en verde — y no con un ícono de nube genérico.
  */
-export function ZonaDeArchivo({ onPress, leyendo = false, archivo }: Props) {
+export function ZonaDeArchivo({ onPress, leyendo = false, archivo, detalle }: Props) {
   return (
     <Pressable
       onPress={onPress}
@@ -51,7 +53,7 @@ export function ZonaDeArchivo({ onPress, leyendo = false, archivo }: Props) {
         </Texto>
         {leyendo ? null : (
           <Texto variante="secundario" style={styles.centrado}>
-            El PDF que descargás del banco, sin editar. También lee Excel y CSV.
+            {detalle ?? 'El PDF que descargás del banco, sin editar.'}
           </Texto>
         )}
       </View>

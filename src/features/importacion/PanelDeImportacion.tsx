@@ -16,7 +16,9 @@ import {
   useCrearCuenta,
   useCuentas,
   useImportar,
+  usePerfil,
 } from '../movimientos/queries';
+import { buscarBanco } from './bancos';
 import { elegirArchivo, leerArchivo } from './archivo';
 import { planificar, type PlanDeImportacion } from './importar';
 import { ErrorDeArchivo, type Lectura, type SeccionImportable } from './tipos';
@@ -33,6 +35,7 @@ type Props = {
  * tenías la pantalla no hacía nada.
  */
 export function PanelDeImportacion({ onListo }: Props) {
+  const perfil = usePerfil();
   const cuentas = useCuentas();
   const categorias = useCategorias();
   const crearCuenta = useCrearCuenta();
@@ -48,6 +51,7 @@ export function PanelDeImportacion({ onListo }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<{ importados: number; omitidos: number } | null>(null);
 
+  const banco = buscarBanco(perfil.data?.bank);
   const seccion: SeccionImportable | null = lectura?.secciones[indice] ?? null;
   const tipoDeCuenta = lectura?.origen === 'tarjeta' ? 'card' : 'bank';
   const compatibles = (cuentas.data ?? []).filter(
@@ -66,8 +70,8 @@ export function PanelDeImportacion({ onListo }: Props) {
       const elegido = await elegirArchivo();
       if (!elegido) return;
 
-      // Sin decirle qué es: el lector reconoce solo si es estado de cuenta o resumen.
-      const leido = await leerArchivo(elegido, {});
+      // Sin decirle qué es: entre los lectores del banco, reconoce solo cuál corresponde.
+      const leido = await leerArchivo(elegido, { banco: banco.id });
       setArchivo(elegido.nombre);
       setLectura(leido);
       setIndice(0);
@@ -168,7 +172,7 @@ export function PanelDeImportacion({ onListo }: Props) {
   if (!lectura) {
     return (
       <View style={styles.bloque}>
-        <ZonaDeArchivo onPress={elegir} leyendo={leyendo} />
+        <ZonaDeArchivo onPress={elegir} leyendo={leyendo} detalle={banco.acepta} />
         {error ? (
           <Texto variante="etiqueta" color={color.error}>
             {error}
