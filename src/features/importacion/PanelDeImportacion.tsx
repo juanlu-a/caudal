@@ -53,7 +53,11 @@ export function PanelDeImportacion({ onListo }: Props) {
   const compatibles = (cuentas.data ?? []).filter(
     (c) => c.kind === tipoDeCuenta && (!seccion || c.currency === seccion.moneda),
   );
-  const cuenta = compatibles.find((c) => c.id === cuentaId) ?? compatibles[0] ?? null;
+  // Si el archivo dice de qué cuenta es, se elige sola.
+  const porNumero = seccion?.identificador
+    ? compatibles.find((c) => c.last4 && seccion.identificador?.endsWith(c.last4))
+    : undefined;
+  const cuenta = compatibles.find((c) => c.id === cuentaId) ?? porNumero ?? compatibles[0] ?? null;
 
   async function elegir() {
     setError(null);
@@ -198,6 +202,7 @@ export function PanelDeImportacion({ onListo }: Props) {
         ) : null}
       </Panel>
 
+      {compatibles.length === 1 ? null : (
       <View style={styles.bloque}>
         <Texto variante="micro">A qué cuenta va</Texto>
         {compatibles.length === 0 ? (
@@ -221,12 +226,13 @@ export function PanelDeImportacion({ onListo }: Props) {
           <View style={styles.chips}>
             {compatibles.map((c) => (
               <Chip key={c.id} activo={c.id === cuenta?.id} onPress={() => setCuentaId(c.id)}>
-                {c.name}
+                {c.currency === 'UYU' ? c.name : `${c.name} · ${c.currency}`}
               </Chip>
             ))}
           </View>
         )}
       </View>
+      )}
 
       {plan ? <Previsualizacion plan={plan} cuenta={cuenta} /> : null}
 
@@ -291,7 +297,7 @@ function Previsualizacion({ plan, cuenta }: { plan: PlanDeImportacion; cuenta: C
     <>
       <Panel>
         <Cifra
-          etiqueta={cuenta?.name ?? 'Movimientos'}
+          etiqueta={cuenta ? `Va a ${cuenta.name}` : 'Movimientos'}
           valor={total}
           moneda={plan.moneda}
           tono="neutro"

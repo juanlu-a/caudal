@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import * as XLSX from 'xlsx';
 
-import { leerEstadoDeCuenta, leerResumenDeTarjeta } from './itau';
+import { leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta } from './itau';
 import { leerPdf } from './pdf';
 import { interpretar, type Matriz } from './parser';
 import { ErrorDeArchivo, type Lectura, type OrigenDeArchivo } from './tipos';
@@ -57,22 +57,19 @@ export async function leerArchivo(
     if (opciones.origen === 'tarjeta') return leerResumenDeTarjeta(lineas);
     if (opciones.origen === 'cuenta') return leerEstadoDeCuenta(lineas);
 
-    // Sin decir qué es, se prueban los dos. El estado de cuenta va primero
-    // porque pide marcas propias (la fecha de cierre tipo «31JUL2026» y las
-    // secciones por moneda) y no se confunde con un resumen de tarjeta.
-    try {
-      return leerEstadoDeCuenta(lineas);
-    } catch (e) {
-      if (!(e instanceof ErrorDeArchivo)) throw e;
+    // Sin decir qué es, se prueban los lectores en orden de exigencia: cada uno
+    // pide marcas propias, así que el que reconoce el archivo es el correcto.
+    for (const leer of [leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta]) {
       try {
-        return leerResumenDeTarjeta(lineas);
-      } catch (segundo) {
-        if (!(segundo instanceof ErrorDeArchivo)) throw segundo;
-        throw new ErrorDeArchivo(
-          'No se reconoce el PDF como estado de cuenta ni como resumen de tarjeta. Tiene que ser el original del banco, sin editar.',
-        );
+        return leer(lineas);
+      } catch (e) {
+        if (!(e instanceof ErrorDeArchivo)) throw e;
       }
     }
+
+    throw new ErrorDeArchivo(
+      'No se reconoce el PDF. Tiene que ser el estado de cuenta, el resumen de tarjeta o la consulta de Itaú Link, tal cual los descargás.',
+    );
   }
 
   // Una planilla no se puede deducir: sin dato, se asume estado de cuenta.

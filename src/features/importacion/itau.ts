@@ -340,3 +340,149 @@ function periodo(secciones: SeccionImportable[]): { desde: string | null; hasta:
   const fechas = secciones.flatMap((s) => s.filas.map((f) => f.fecha)).sort();
   return { desde: fechas[0] ?? null, hasta: fechas[fechas.length - 1] ?? null };
 }
+
+// --------------------------------------------- estado de cuenta del mes en curso
+
+/**
+ * El estado de cuenta que se baja de Itaú Link, que es la página impresa a PDF y
+ * no el resumen mensual. Tiene encabezado propio y una tabla con columnas
+ * separadas de débito y crédito.
+ *
+ * La fila no dice a qué columna pertenece su importe: una de las dos viene
+ * vacía y al reconstruir la tabla desaparece. Se resuelve por posición — las
+ * columnas están alineadas a la derecha — y se controla contra el saldo
+ * corriente, que sí viene en cada fila.
+ */
+const ENCABEZADO_LINK = ['fecha', 'concepto', 'debito', 'credito', 'saldo'];
+
+export function leerLinkDeItau(lineas: LineaDePdf[]): Lectura {
+  const iEncabezado = lineas.findIndex((l) => {
+    const celdas = l.celdas.map((c) => normalizar(c));
+    return ENCABEZADO_LINK.every((nombre) => celdas.some((c) => c === nombre));
+  });
+
+  if (iEncabezado === -1) {
+    throw new ErrorDeArchivo(
+      'No se encontró la tabla de movimientos. Tiene que ser el PDF que baja Itaú Link, sin editar.',
+    );
+  }
+
+  // Dónde termina cada columna, para saber después a cuál pertenece un importe.
+  const encabezado = lineas[iEncabezado];
+  const columna = new Map<string, number>();
+  encabezado.celdas.forEach((celda, i) => {
+    const nombre = normalizar(celda);
+    if (ENCABEZADO_LINK.includes(nombre)) columna.set(nombre, encabezado.derecha[i]);
+  });
+
+  /** La columna cuyo borde derecho queda más cerca del importe. */
+  function columnaDe(borde: number): string | null {
+    let mejor: { nombre: string; distancia: number } | null = null;
+    for (const nombre of ['debito', 'credito', 'saldo']) {
+      const ref = columna.get(nombre);
+      if (ref == null) continue;
+      const distancia = Math.abs(borde - ref);
+      if (!mejor || distancia < mejor.distancia) mejor = { nombre, distancia };
+    }
+    return mejor && mejor.distancia < 60 ? mejor.nombre : null;
+  }
+
+  const { moneda, numero } = cabeceraDeLink(lineas.slice(0, iEncabezado));
+  const filas: FilaImportada[] = [];
+  const avisos: string[] = [];
+  let saldoAnterior: number | null = null;
+
+  for (const linea of lineas.slice(iEncabezado + 1)) {
+    const fecha = fechaDeLink(linea.celdas[0] ?? '');
+    if (!fecha) continue;
+
+    let importe: number | null = null;
+    let signo = 0;
+    let saldo: number | null = null;
+
+    linea.celdas.forEach((celda, i) => {
+      const valor = parsearImporte(celda);
+      if (valor == null || !/\d,\d{2}$/.test(celda)) return;
+
+      switch (columnaDe(linea.derecha[i])) {
+        case 'debito':
+          importe = valor;
+          signo = -1;
+          break;
+        case 'credito':
+          importe = valor;
+          signo = 1;
+          break;
+        case 'saldo':
+          saldo = valor;
+          break;
+      }
+    });
+
+    if (importe == null || signo === 0 || saldo == null) continue;
+    const monto = redondear(signo * Math.abs(importe));
+
+    // El saldo corriente confirma el signo que dio la columna.
+    if (saldoAnterior != null && Math.abs(saldoAnterior + monto - saldo) > 0.01) {
+      avisos.push(
+        `El movimiento del ${fecha} no cierra con el saldo de la fila. Revisalo antes de importar.`,
+      );
+    }
+    saldoAnterior = saldo;
+
+    filas.push({
+      fecha,
+      descripcion: limpiarDescripcion(linea.celdas.slice(1, -2).join(' ')),
+      monto,
+      saldo,
+      moneda,
+      fila: linea.pagina,
+    });
+  }
+
+  if (filas.length === 0) {
+    throw new ErrorDeArchivo('El PDF no tiene movimientos en el período que muestra.');
+  }
+
+  const seccion: SeccionImportable = {
+    moneda,
+    identificador: numero,
+    filas,
+    apertura: null,
+    cierre: filas[filas.length - 1].saldo,
+    // Sin saldo de apertura no hay contra qué cuadrar el total: el control se
+    // hizo fila por fila contra el saldo corriente.
+    descuadre: null,
+  };
+
+  const fechas = filas.map((f) => f.fecha).sort();
+  return {
+    origen: 'cuenta',
+    secciones: [seccion],
+    desde: fechas[0] ?? null,
+    hasta: fechas[fechas.length - 1] ?? null,
+    avisos,
+  };
+}
+
+/** «14-08-26» → 14 de agosto de 2026. */
+function fechaDeLink(celda: string): string | null {
+  const m = celda.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
+  if (!m) return null;
+  return iso(2000 + Number(m[3]), Number(m[2]), Number(m[1]));
+}
+
+/** Del encabezado salen el número de cuenta y la moneda. */
+function cabeceraDeLink(lineas: LineaDePdf[]): { moneda: string; numero: string | null } {
+  let moneda = 'UYU';
+  let numero: string | null = null;
+
+  for (const linea of lineas) {
+    for (const celda of linea.celdas) {
+      const texto = normalizar(celda);
+      if (/^(dolares|dolar|usd)$/.test(texto)) moneda = 'USD';
+      if (/^\d{6,}$/.test(celda) && !numero) numero = celda;
+    }
+  }
+  return { moneda, numero };
+}
