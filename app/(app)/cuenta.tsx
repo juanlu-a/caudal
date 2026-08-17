@@ -10,7 +10,7 @@ import { Texto } from '../../src/components/Texto';
 import { useAuth } from '../../src/features/auth/AuthProvider';
 import { BANCOS, BANCO_POR_DEFECTO } from '../../src/features/importacion/bancos';
 import { useActualizarPerfil, usePerfil, useSaldos } from '../../src/features/movimientos/queries';
-import { formatMoneda } from '../../src/lib/format';
+import { formatFecha, formatMoneda } from '../../src/lib/format';
 import { color, espacio, margenPantalla, radio } from '../../src/theme';
 
 const MONEDAS = ['UYU', 'USD', 'ARS', 'EUR', 'BRL'] as const;
@@ -70,7 +70,14 @@ export default function Cuenta() {
         <View style={styles.saldos}>
           {(saldos.data ?? []).map((s) => (
             <View key={s.account_id} style={styles.saldo}>
-              <Texto variante="etiqueta">{s.name}</Texto>
+              <View style={styles.nombreCuenta}>
+                <Texto variante="etiqueta">{s.name}</Texto>
+                {s.confirmed_on ? (
+                  <Texto variante="dato">Confirmado al {formatFecha(s.confirmed_on)}</Texto>
+                ) : (
+                  <Texto variante="dato">Suma de lo cargado</Texto>
+                )}
+              </View>
               <Texto variante="cifraLista" style={styles.saldoCifra}>
                 {formatMoneda(s.saldo, s.currency, { decimales: 'ocultarEnCero' })}
               </Texto>
@@ -167,6 +174,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: espacio[4],
+  },
+  nombreCuenta: {
+    gap: 2,
+    flex: 1,
   },
   saldoCifra: {
     textAlign: 'right',

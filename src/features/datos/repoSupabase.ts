@@ -73,11 +73,10 @@ export const repositorio: Repositorio = {
     const userId = await idDeUsuario();
     const nuevos = plan.movimientos.filter((m) => !m.duplicado);
 
-    // Cómo estaba la cuenta antes de esto, para saber si corresponde fijar el
-    // saldo de apertura.
+    // Hasta qué fecha teníamos confirmado el saldo de esta cuenta.
     const { data: cuentaAntes } = await supabase
       .from('accounts')
-      .select('opening_on')
+      .select('confirmed_on')
       .eq('id', plan.cuentaId)
       .maybeSingle();
 
@@ -135,16 +134,17 @@ export const repositorio: Repositorio = {
       importados += data?.length ?? 0;
     }
 
-    // El saldo de apertura es lo que había antes del primer movimiento cargado.
-    // Sin él, el saldo de la cuenta arranca de cero y nunca coincide con el del
-    // banco. Se fija con el primer extracto, y se corrige si después se carga uno
-    // más viejo que empieza antes.
-    if (plan.apertura != null && plan.desde) {
-      const anterior = cuentaAntes?.opening_on ?? null;
-      if (anterior == null || plan.desde < anterior) {
+    // El saldo que informa el extracto es la verdad más reciente que tenemos de
+    // esa cuenta: ya incluye todo lo anterior, esté cargado o no. Solo se pisa
+    // con uno más nuevo.
+    if (plan.cierre != null && plan.hasta) {
+      const anterior = cuentaAntes?.confirmed_on ?? null;
+      if (anterior == null || plan.hasta > anterior) {
+        // En la tarjeta el resumen informa deuda, que en Caudal es saldo negativo.
+        const saldo = plan.origen === 'tarjeta' ? -plan.cierre : plan.cierre;
         const { error } = await supabase
           .from('accounts')
-          .update({ opening_balance: plan.apertura, opening_on: plan.desde })
+          .update({ confirmed_balance: saldo, confirmed_on: plan.hasta })
           .eq('id', plan.cuentaId);
         if (error) throw error;
       }

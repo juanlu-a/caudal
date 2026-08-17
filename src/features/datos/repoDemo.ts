@@ -91,8 +91,8 @@ function sembrar(): Estado {
       kind: 'bank',
       currency: 'UYU',
       last4: null,
-      opening_balance: 0,
-      opening_on: null,
+      confirmed_balance: null,
+      confirmed_on: null,
       archived: false,
       created_at: ahora,
     },
@@ -205,8 +205,8 @@ export const repositorio: Repositorio = {
       kind: datos.kind,
       currency: datos.currency ?? estado.perfil.currency,
       last4: datos.last4 ?? null,
-      opening_balance: 0,
-      opening_on: null,
+      confirmed_balance: null,
+      confirmed_on: null,
       archived: false,
       created_at: new Date().toISOString(),
     };
@@ -226,14 +226,17 @@ export const repositorio: Repositorio = {
           name: cuenta.name,
           kind: cuenta.kind,
           currency: cuenta.currency,
-          opening_balance: cuenta.opening_balance,
-          // El saldo de una cuenta sí incluye las transferencias: la plata se movió.
-          // Y arranca del saldo de apertura, que es lo que había antes de lo cargado.
-          // Se redondea porque sumar decimales en coma flotante deja restos:
-          // Postgres usa numeric y no tiene el problema, este almacén sí.
+          confirmed_balance: cuenta.confirmed_balance,
+          confirmed_on: cuenta.confirmed_on,
+          // El saldo arranca del último que confirmó el banco y suma solo lo
+          // posterior: ese número ya incluye todo lo de antes, lo tengamos
+          // cargado o no. Se redondea porque sumar decimales en coma flotante
+          // deja restos; Postgres usa numeric y no tiene el problema.
           saldo:
             Math.round(
-              suyos.reduce((suma, m) => suma + Number(m.amount), cuenta.opening_balance) * 100,
+              suyos
+                .filter((m) => !cuenta.confirmed_on || m.occurred_on > cuenta.confirmed_on)
+                .reduce((suma, m) => suma + Number(m.amount), cuenta.confirmed_balance ?? 0) * 100,
             ) / 100,
           movimientos: suyos.length,
           ultimo_movimiento: suyos.map((m) => m.occurred_on).sort().at(-1) ?? null,
@@ -296,13 +299,14 @@ export const repositorio: Repositorio = {
       });
     }
 
-    // El saldo de apertura es lo que había antes del primer movimiento cargado:
-    // sin él la cuenta arranca de cero y no coincide con el banco. Se fija con el
-    // primer extracto y se corrige si después llega uno más viejo.
+    // El saldo que informa el extracto es la verdad más reciente que tenemos de
+    // esa cuenta. Solo se pisa con uno más nuevo.
     const cuentas = estado.cuentas.map((c) => {
-      if (c.id !== plan.cuentaId || plan.apertura == null || !plan.desde) return c;
-      if (c.opening_on != null && plan.desde >= c.opening_on) return c;
-      return { ...c, opening_balance: plan.apertura, opening_on: plan.desde };
+      if (c.id !== plan.cuentaId || plan.cierre == null || !plan.hasta) return c;
+      if (c.confirmed_on != null && plan.hasta <= c.confirmed_on) return c;
+      // En la tarjeta el resumen informa deuda, que en Caudal es saldo negativo.
+      const saldo = plan.origen === 'tarjeta' ? -plan.cierre : plan.cierre;
+      return { ...c, confirmed_balance: saldo, confirmed_on: plan.hasta };
     });
 
     await guardar({ ...estado, cuentas, movimientos: [...agregados, ...estado.movimientos] });
