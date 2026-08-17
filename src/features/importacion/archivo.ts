@@ -31,7 +31,8 @@ export async function elegirArchivo(): Promise<ArchivoElegido | null> {
 }
 
 export type OpcionesDeArchivo = {
-  origen: OrigenDeArchivo;
+  /** Si no se dice qué es el archivo, se deduce del contenido. */
+  origen?: OrigenDeArchivo;
   monedaPorDefecto?: string;
 };
 
@@ -53,12 +54,29 @@ export async function leerArchivo(
 
   if (esPdf) {
     const lineas = await leerPdf(archivo.bytes);
-    return opciones.origen === 'tarjeta'
-      ? leerResumenDeTarjeta(lineas)
-      : leerEstadoDeCuenta(lineas);
+    if (opciones.origen === 'tarjeta') return leerResumenDeTarjeta(lineas);
+    if (opciones.origen === 'cuenta') return leerEstadoDeCuenta(lineas);
+
+    // Sin decir qué es, se prueban los dos. El estado de cuenta va primero
+    // porque pide marcas propias (la fecha de cierre tipo «31JUL2026» y las
+    // secciones por moneda) y no se confunde con un resumen de tarjeta.
+    try {
+      return leerEstadoDeCuenta(lineas);
+    } catch (e) {
+      if (!(e instanceof ErrorDeArchivo)) throw e;
+      try {
+        return leerResumenDeTarjeta(lineas);
+      } catch (segundo) {
+        if (!(segundo instanceof ErrorDeArchivo)) throw segundo;
+        throw new ErrorDeArchivo(
+          'No se reconoce el PDF como estado de cuenta ni como resumen de tarjeta. Tiene que ser el original del banco, sin editar.',
+        );
+      }
+    }
   }
 
-  return leerPlanilla(archivo.bytes, opciones);
+  // Una planilla no se puede deducir: sin dato, se asume estado de cuenta.
+  return leerPlanilla(archivo.bytes, { ...opciones, origen: opciones.origen ?? 'cuenta' });
 }
 
 /** Cada hoja del libro como matriz de celdas. */
@@ -87,7 +105,10 @@ function hojasDe(bytes: Uint8Array): { nombre: string; matriz: Matriz }[] {
  * Planillas. Prueba hoja por hoja y se queda con la primera que tenga una tabla
  * de movimientos reconocible: los extractos suelen traer una portada antes.
  */
-function leerPlanilla(bytes: Uint8Array, opciones: OpcionesDeArchivo): Lectura {
+function leerPlanilla(
+  bytes: Uint8Array,
+  opciones: OpcionesDeArchivo & { origen: OrigenDeArchivo },
+): Lectura {
   const hojas = hojasDe(bytes);
   if (hojas.length === 0) throw new ErrorDeArchivo('El archivo no tiene ninguna hoja con datos.');
 

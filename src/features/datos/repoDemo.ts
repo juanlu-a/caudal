@@ -307,7 +307,7 @@ export const repositorio: Repositorio = {
     return (await leer()).movimientos.find((m) => m.id === id) ?? null;
   },
 
-  async totales(meses) {
+  async totales(meses, desplazamiento = 0) {
     const estado = await leer();
     const acumulado = new Map<string, TotalesDelMes>();
 
@@ -334,7 +334,7 @@ export const repositorio: Repositorio = {
     }
 
     return Array.from({ length: meses }, (_, i) => {
-      const mes = inicioDeMes(sumarMeses(new Date(), -(meses - 1 - i)));
+      const mes = inicioDeMes(sumarMeses(new Date(), desplazamiento - (meses - 1 - i)));
       return (
         acumulado.get(mes) ?? {
           user_id: USUARIO,

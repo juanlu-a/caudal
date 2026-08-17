@@ -70,7 +70,8 @@ export type Repositorio = {
   categorias(): Promise<Categoria[]>;
   movimientos(mes?: string, limite?: number): Promise<MovimientoConCategoria[]>;
   movimiento(id: string): Promise<MovimientoConCategoria | null>;
-  totales(meses: number): Promise<TotalesDelMes[]>;
+  /** `desplazamiento` corre la ventana: 0 termina en el mes actual, -1 en el anterior. */
+  totales(meses: number, desplazamiento?: number): Promise<TotalesDelMes[]>;
   crearMovimiento(nuevo: NuevoMovimiento): Promise<MovimientoConCategoria>;
   borrarMovimiento(id: string): Promise<void>;
 };

@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +16,6 @@ const MONEDAS = ['UYU', 'USD', 'ARS', 'EUR', 'BRL'] as const;
 export default function Cuenta() {
   const insets = useSafeAreaInsets();
   const { session, salir, demo } = useAuth();
-  const router = useRouter();
   const perfil = usePerfil();
   const saldos = useSaldos();
   const actualizar = useActualizarPerfil();
@@ -75,11 +73,6 @@ export default function Cuenta() {
               </Texto>
             </View>
           ))}
-        </View>
-        <View style={styles.accion}>
-          <Boton variante="secundario" ancho="contenido" onPress={() => router.push('/importar')}>
-            Importar del banco
-          </Boton>
         </View>
       </Panel>
 

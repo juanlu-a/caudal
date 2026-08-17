@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { Boton } from '../src/components/Boton';
+import { PanelDeImportacion } from '../src/features/importacion/PanelDeImportacion';
 import { Campo } from '../src/components/Campo';
 import { IconoCategoria } from '../src/components/IconoCategoria';
 import { Texto } from '../src/components/Texto';
@@ -30,6 +31,7 @@ import {
 } from '../src/theme';
 
 type Tipo = 'gasto' | 'ingreso';
+type Modo = 'manual' | 'importar';
 
 export default function NuevoMovimiento() {
   const router = useRouter();
@@ -37,6 +39,7 @@ export default function NuevoMovimiento() {
   const categorias = useCategorias();
   const crear = useCrearMovimiento();
 
+  const [modo, setModo] = useState<Modo>('manual');
   const [tipo, setTipo] = useState<Tipo>('gasto');
   const [montoTexto, setMontoTexto] = useState('');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
@@ -79,6 +82,19 @@ export default function NuevoMovimiento() {
         contentContainerStyle={styles.contenido}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic">
+        <View style={styles.segmentos}>
+          <Segmento activo={modo === 'manual'} onPress={() => setModo('manual')}>
+            A mano
+          </Segmento>
+          <Segmento activo={modo === 'importar'} onPress={() => setModo('importar')}>
+            Desde el banco
+          </Segmento>
+        </View>
+
+        {modo === 'importar' ? (
+          <PanelDeImportacion onListo={() => router.back()} />
+        ) : (
+          <>
         <View style={styles.segmentos}>
           <Segmento activo={tipo === 'gasto'} onPress={() => setTipo('gasto')}>
             Gasto
@@ -167,6 +183,8 @@ export default function NuevoMovimiento() {
         <Boton onPress={guardar} cargando={crear.isPending} deshabilitado={!monto}>
           Guardar
         </Boton>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

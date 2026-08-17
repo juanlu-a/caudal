@@ -91,10 +91,10 @@ export function useMovimiento(id: string) {
 }
 
 /** Totales de los ultimos N meses, del mas viejo al mas nuevo, sin huecos. */
-export function useTotales(meses = 7) {
+export function useTotales(meses = 7, desplazamiento = 0) {
   return useQuery({
-    queryKey: [...claves.totales, meses],
-    queryFn: () => repo.totales(meses),
+    queryKey: [...claves.totales, meses, desplazamiento],
+    queryFn: () => repo.totales(meses, desplazamiento),
   });
 }
 

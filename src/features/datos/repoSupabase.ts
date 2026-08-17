@@ -178,8 +178,8 @@ export const repositorio: Repositorio = {
     return (data ?? null) as unknown as MovimientoConCategoria | null;
   },
 
-  async totales(meses) {
-    const desde = inicioDeMes(sumarMeses(new Date(), -(meses - 1)));
+  async totales(meses, desplazamiento = 0) {
+    const desde = inicioDeMes(sumarMeses(new Date(), desplazamiento - (meses - 1)));
     const { data, error } = await pedirSupabase()
       .from('monthly_totals')
       .select('*')
@@ -191,7 +191,7 @@ export const repositorio: Repositorio = {
     // para que el grafico no cambie de forma segun cuanto se gasto.
     const porMes = new Map((data ?? []).map((f) => [f.month, f as TotalesDelMes]));
     return Array.from({ length: meses }, (_, i) => {
-      const mes = inicioDeMes(sumarMeses(new Date(), -(meses - 1 - i)));
+      const mes = inicioDeMes(sumarMeses(new Date(), desplazamiento - (meses - 1 - i)));
       return (
         porMes.get(mes) ?? {
           user_id: '',

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Boton } from '../../src/components/Boton';
@@ -21,17 +22,22 @@ import {
   formatVariacion,
   inicioDeMes,
   parseFechaISO,
+  sumarMeses,
 } from '../../src/lib/format';
-import { color, espacio, margenPantalla } from '../../src/theme';
+import { areaTactilMinima, color, espacio, margenPantalla } from '../../src/theme';
 
 export default function Mes() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const mesActual = inicioDeMes(new Date());
+  // 0 es el mes en curso. Los movimientos importados suelen ser del mes pasado,
+  // así que la pantalla tiene que dejar caminar hacia atrás.
+  const [desplazamiento, setDesplazamiento] = useState(0);
+  const fechaDelMes = sumarMeses(new Date(), desplazamiento);
+  const mesElegido = inicioDeMes(fechaDelMes);
 
   const perfil = usePerfil();
-  const totales = useTotales(7);
-  const movimientos = useMovimientos(mesActual);
+  const totales = useTotales(7, desplazamiento);
+  const movimientos = useMovimientos(mesElegido);
 
   const moneda = perfil.data?.currency ?? 'UYU';
   const serie = totales.data ?? [];
@@ -70,7 +76,18 @@ export default function Mes() {
         }>
         <View style={styles.encabezado}>
           <Isotipo tamano={28} />
-          <Texto variante="micro">{formatMes(new Date())}</Texto>
+          <View style={styles.selectorMes}>
+            <Flecha
+              hacia="anterior"
+              onPress={() => setDesplazamiento((d) => d - 1)}
+            />
+            <Texto variante="micro">{formatMes(fechaDelMes)}</Texto>
+            <Flecha
+              hacia="siguiente"
+              onPress={() => setDesplazamiento((d) => Math.min(0, d + 1))}
+              deshabilitada={desplazamiento >= 0}
+            />
+          </View>
         </View>
 
         <Panel>
@@ -122,7 +139,10 @@ export default function Mes() {
             </Texto>
             <GraficoBarras
               datos={serie.map((m, i) => ({
-                etiqueta: i === serie.length - 1 ? 'HOY' : abreviaturaMes(parseFechaISO(m.month)),
+                etiqueta:
+                  i === serie.length - 1 && desplazamiento === 0
+                    ? 'HOY'
+                    : abreviaturaMes(parseFechaISO(m.month)),
                 valor: m.gastos,
                 destacado: i === serie.length - 1,
               }))}
@@ -142,8 +162,8 @@ export default function Mes() {
                 <Boton
                   variante="secundario"
                   ancho="contenido"
-                  onPress={() => router.push('/importar')}>
-                  Importar del banco
+                  onPress={() => router.push('/nuevo')}>
+                  Traer del banco
                 </Boton>
               }
             />
@@ -160,6 +180,29 @@ export default function Mes() {
   );
 }
 
+function Flecha({
+  hacia,
+  onPress,
+  deshabilitada,
+}: {
+  hacia: 'anterior' | 'siguiente';
+  onPress: () => void;
+  deshabilitada?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={deshabilitada}
+      accessibilityRole="button"
+      accessibilityLabel={hacia === 'anterior' ? 'Mes anterior' : 'Mes siguiente'}
+      style={[styles.flecha, deshabilitada && styles.flechaInactiva]}>
+      <Texto variante="titulo2" color={color.textoSecundario}>
+        {hacia === 'anterior' ? '‹' : '›'}
+      </Texto>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   pantalla: {
     flex: 1,
@@ -173,6 +216,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  selectorMes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  flecha: {
+    width: areaTactilMinima,
+    height: areaTactilMinima,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flechaInactiva: {
+    opacity: 0.3,
   },
   desglose: {
     flexDirection: 'row',

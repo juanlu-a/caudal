@@ -82,7 +82,7 @@ function Navegacion() {
         options={{
           presentation: 'modal',
           headerShown: true,
-          title: 'Nuevo movimiento',
+          title: 'Agregar movimiento',
           ...encabezado,
         }}
       />
@@ -91,15 +91,6 @@ function Navegacion() {
         options={{
           headerShown: true,
           title: 'Movimiento',
-          ...encabezado,
-        }}
-      />
-      <Stack.Screen
-        name="importar"
-        options={{
-          presentation: 'modal',
-          headerShown: true,
-          title: 'Importar del banco',
           ...encabezado,
         }}
       />

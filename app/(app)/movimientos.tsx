@@ -123,8 +123,8 @@ export default function Movimientos() {
                   <Boton
                     variante="secundario"
                     ancho="contenido"
-                    onPress={() => router.push('/importar')}>
-                    Importar del banco
+                    onPress={() => router.push('/nuevo')}>
+                    Traer del banco
                   </Boton>
                 )
               }
