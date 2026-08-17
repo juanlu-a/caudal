@@ -50,8 +50,16 @@ function Navegacion() {
   useEffect(() => {
     if (cargando) return;
 
-    // En modo demo no hay cuentas: se entra derecho al contenido local.
+    // La pantalla de confirmación se abre desde el mail, sin sesión todavía:
+    // si el guardia la mandara a ingresar, el código nunca se canjearía.
     const enAuth = segmentos[0] === '(auth)';
+    const confirmando = segmentos[0] === 'confirmado';
+    if (confirmando) {
+      SplashScreen.hideAsync();
+      return;
+    }
+
+    // En modo demo no hay cuentas: se entra derecho al contenido local.
     if (!demo && !session && !enAuth) {
       router.replace('/ingresar');
     } else if ((demo || session) && enAuth) {
@@ -68,6 +76,7 @@ function Navegacion() {
       }}>
       <Stack.Screen name="(app)" />
       <Stack.Screen name="(auth)" />
+      <Stack.Screen name="confirmado" />
       <Stack.Screen
         name="nuevo"
         options={{

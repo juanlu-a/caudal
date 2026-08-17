@@ -43,26 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // El link del mail de confirmación abre la app con un código: se canjea por la
-  // sesión. Sirve tanto si la app estaba cerrada como si estaba abierta.
-  useEffect(() => {
-    if (!supabase) return;
-
-    async function canjear(url: string | null) {
-      if (!url || !supabase) return;
-      const { queryParams } = Linking.parse(url);
-      const codigo = typeof queryParams?.code === 'string' ? queryParams.code : null;
-      if (!codigo) return;
-
-      const { error } = await supabase.auth.exchangeCodeForSession(codigo);
-      if (error) console.warn('[auth] no se pudo canjear el código del mail:', error.message);
-    }
-
-    Linking.getInitialURL().then(canjear);
-    const sub = Linking.addEventListener('url', ({ url }) => canjear(url));
-    return () => sub.remove();
-  }, []);
-
   const valor = useMemo<Contexto>(
     () => ({
       session,
