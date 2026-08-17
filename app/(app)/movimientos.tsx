@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Boton } from '../../src/components/Boton';
 import { EstadoVacio } from '../../src/components/EstadoVacio';
 import { FilaMovimiento } from '../../src/components/FilaMovimiento';
 import { Texto } from '../../src/components/Texto';
@@ -115,7 +116,17 @@ export default function Movimientos() {
               detalle={
                 categoriaId
                   ? 'Probá sacando el filtro de categoría.'
-                  : 'Agregá el primero desde la pantalla del mes.'
+                  : 'Traé el estado de cuenta del banco y se cargan todos juntos.'
+              }
+              accion={
+                categoriaId ? null : (
+                  <Boton
+                    variante="secundario"
+                    ancho="contenido"
+                    onPress={() => router.push('/importar')}>
+                    Importar del banco
+                  </Boton>
+                )
               }
             />
           )

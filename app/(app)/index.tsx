@@ -1,6 +1,8 @@
+import { useRouter } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Boton } from '../../src/components/Boton';
 import { Cifra } from '../../src/components/Cifra';
 import { EstadoVacio } from '../../src/components/EstadoVacio';
 import { FilaMovimiento } from '../../src/components/FilaMovimiento';
@@ -23,6 +25,7 @@ import {
 import { color, espacio, margenPantalla } from '../../src/theme';
 
 export default function Mes() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const mesActual = inicioDeMes(new Date());
 
@@ -134,7 +137,15 @@ export default function Mes() {
           {ultimos.length === 0 && !movimientos.isLoading ? (
             <EstadoVacio
               titulo="Todavía no hay movimientos"
-              detalle="Agregá el primero y el saldo del mes empieza a moverse."
+              detalle="Traé el estado de cuenta del banco y se cargan todos juntos, o agregá el primero a mano."
+              accion={
+                <Boton
+                  variante="secundario"
+                  ancho="contenido"
+                  onPress={() => router.push('/importar')}>
+                  Importar del banco
+                </Boton>
+              }
             />
           ) : (
             <View style={styles.lista}>
