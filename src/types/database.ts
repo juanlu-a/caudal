@@ -72,6 +72,8 @@ export type Database = {
           kind: TipoDeCuenta;
           currency: string;
           last4: string | null;
+          /** Número de cuenta según el banco: reconoce las transferencias propias. */
+          external_number: string | null;
           /** Último saldo que confirmó el banco, del extracto más reciente. */
           confirmed_balance: number | null;
           confirmed_on: string | null;
@@ -85,6 +87,7 @@ export type Database = {
           kind?: TipoDeCuenta;
           currency?: string;
           last4?: string | null;
+          external_number?: string | null;
           archived?: boolean;
           created_at?: string;
         };
@@ -93,6 +96,7 @@ export type Database = {
           kind?: TipoDeCuenta;
           currency?: string;
           last4?: string | null;
+          external_number?: string | null;
           confirmed_balance?: number | null;
           confirmed_on?: string | null;
           archived?: boolean;

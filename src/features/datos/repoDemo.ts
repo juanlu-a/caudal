@@ -91,6 +91,7 @@ function sembrar(): Estado {
       kind: 'bank',
       currency: 'UYU',
       last4: null,
+      external_number: null,
       confirmed_balance: null,
       confirmed_on: null,
       archived: false,
@@ -205,6 +206,7 @@ export const repositorio: Repositorio = {
       kind: datos.kind,
       currency: datos.currency ?? estado.perfil.currency,
       last4: datos.last4 ?? null,
+      external_number: datos.external_number ?? null,
       confirmed_balance: null,
       confirmed_on: null,
       archived: false,
@@ -273,7 +275,11 @@ export const repositorio: Repositorio = {
       yaEstan.add(movimiento.clave);
 
       const categoria = estado.categorias.find((c) => c.id === movimiento.categoriaId) ?? null;
-      const esTransferencia = movimiento.pagoDeTarjeta && comoTransferencia;
+      // Un traspaso entre cuentas propias siempre es plata que solo cambia de
+      // lugar. El pago de tarjeta, en cambio, depende de si además se lleva el
+      // resumen: si no, ese pago es el único rastro del gasto.
+      const esTransferencia =
+        movimiento.entreCuentasPropias || (movimiento.pagoDeTarjeta && comoTransferencia);
       if (esTransferencia) transferencias++;
 
       agregados.push({

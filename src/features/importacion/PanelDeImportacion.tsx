@@ -101,6 +101,7 @@ export function PanelDeImportacion({ onListo }: Props) {
           cuentaId: cuenta.id,
           archivo: archivo ?? '',
           categorias: categorias.data ?? [],
+          cuentas: cuentas.data ?? [],
           clavesExistentes,
         });
 
@@ -114,7 +115,7 @@ export function PanelDeImportacion({ onListo }: Props) {
     return () => {
       vivo = false;
     };
-  }, [lectura, seccion, cuenta, archivo, categorias.data]);
+  }, [lectura, seccion, cuenta, archivo, categorias.data, cuentas.data]);
 
   async function crearLaCuenta() {
     if (!seccion || !lectura) return;
@@ -125,6 +126,7 @@ export function PanelDeImportacion({ onListo }: Props) {
         kind: tipoDeCuenta,
         currency: seccion.moneda,
         last4: seccion.identificador?.slice(-4) ?? null,
+        external_number: seccion.identificador ?? null,
       });
       setCuentaId(nueva.id);
     } catch (e) {
@@ -310,6 +312,9 @@ function Previsualizacion({ plan, cuenta }: { plan: PlanDeImportacion; cuenta: C
         <View style={styles.resumen}>
           <Dato etiqueta="Nuevos" valor={String(plan.nuevos)} />
           <Dato etiqueta="Ya estaban" valor={String(plan.duplicados)} />
+          {plan.transferenciasPropias > 0 ? (
+            <Dato etiqueta="Entre tus cuentas" valor={String(plan.transferenciasPropias)} />
+          ) : null}
         </View>
 
         {plan.descuadre === 0 ? (

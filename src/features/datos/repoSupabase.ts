@@ -105,7 +105,11 @@ export const repositorio: Repositorio = {
     let transferencias = 0;
 
     for (const movimiento of nuevos) {
-      const esTransferencia = movimiento.pagoDeTarjeta && comoTransferencia;
+      // Un traspaso entre cuentas propias siempre es plata que solo cambia de
+      // lugar. El pago de tarjeta, en cambio, depende de si además se lleva el
+      // resumen: si no, ese pago es el único rastro del gasto.
+      const esTransferencia =
+        movimiento.entreCuentasPropias || (movimiento.pagoDeTarjeta && comoTransferencia);
       if (esTransferencia) transferencias++;
 
       filas.push({

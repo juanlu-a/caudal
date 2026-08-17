@@ -33,6 +33,8 @@ export type NuevaCuenta = {
   kind: TipoDeCuenta;
   currency?: string;
   last4?: string | null;
+  /** Número con el que el banco identifica la cuenta. */
+  external_number?: string | null;
 };
 
 export type ResultadoDeImportacion = {
