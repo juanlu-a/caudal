@@ -72,6 +72,9 @@ export type Database = {
           kind: TipoDeCuenta;
           currency: string;
           last4: string | null;
+          /** Saldo anterior al primer movimiento cargado. Sale del extracto. */
+          opening_balance: number;
+          opening_on: string | null;
           archived: boolean;
           created_at: string;
         };
@@ -90,6 +93,8 @@ export type Database = {
           kind?: TipoDeCuenta;
           currency?: string;
           last4?: string | null;
+          opening_balance?: number;
+          opening_on?: string | null;
           archived?: boolean;
         };
         Relationships: [];
@@ -185,6 +190,7 @@ export type Database = {
           name: string;
           kind: TipoDeCuenta;
           currency: string;
+          opening_balance: number;
           saldo: number;
           movimientos: number;
           ultimo_movimiento: string | null;

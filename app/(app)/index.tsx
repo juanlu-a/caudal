@@ -116,6 +116,8 @@ export default function Mes() {
                 valor={esteMes?.ingresos ?? 0}
                 moneda={moneda}
                 variante="cifraMedia"
+                // La etiqueta ya dice «Ingresos»: el «+» delante del símbolo sobra.
+                signo={false}
                 decimales="ocultarEnCero"
               />
             </View>
@@ -126,6 +128,10 @@ export default function Mes() {
                 moneda={moneda}
                 variante="cifraMedia"
                 tono="neutro"
+                // Pedido explícito, contra la regla del manual de que un gasto no
+                // es un error. Se usa el Coral de la paleta y solo en este panel:
+                // en las listas el gasto sigue siendo neutro.
+                color={color.error}
                 decimales="ocultarEnCero"
               />
             </View>

@@ -73,6 +73,14 @@ export const repositorio: Repositorio = {
     const userId = await idDeUsuario();
     const nuevos = plan.movimientos.filter((m) => !m.duplicado);
 
+    // Cómo estaba la cuenta antes de esto, para saber si corresponde fijar el
+    // saldo de apertura.
+    const { data: cuentaAntes } = await supabase
+      .from('accounts')
+      .select('opening_on')
+      .eq('id', plan.cuentaId)
+      .maybeSingle();
+
     const { data: importacion, error: errorImport } = await supabase
       .from('imports')
       .insert({
@@ -125,6 +133,21 @@ export const repositorio: Repositorio = {
         .select('id');
       if (error) throw error;
       importados += data?.length ?? 0;
+    }
+
+    // El saldo de apertura es lo que había antes del primer movimiento cargado.
+    // Sin él, el saldo de la cuenta arranca de cero y nunca coincide con el del
+    // banco. Se fija con el primer extracto, y se corrige si después se carga uno
+    // más viejo que empieza antes.
+    if (plan.apertura != null && plan.desde) {
+      const anterior = cuentaAntes?.opening_on ?? null;
+      if (anterior == null || plan.desde < anterior) {
+        const { error } = await supabase
+          .from('accounts')
+          .update({ opening_balance: plan.apertura, opening_on: plan.desde })
+          .eq('id', plan.cuentaId);
+        if (error) throw error;
+      }
     }
 
     return { importados, omitidos: plan.duplicados, transferencias };

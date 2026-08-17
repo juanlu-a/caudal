@@ -31,6 +31,8 @@ export type PlanDeImportacion = {
    * banco. Cero es la confirmación de que se leyó el archivo entero y bien.
    */
   descuadre: number | null;
+  /** Saldo anterior al primer movimiento del archivo, si el extracto lo dice. */
+  apertura: number | null;
   avisos: string[];
 };
 
@@ -143,6 +145,7 @@ export function planificar(
     duplicados,
     pagosDeTarjeta,
     descuadre: seccion.descuadre,
+    apertura: seccion.apertura,
     avisos,
   };
 }

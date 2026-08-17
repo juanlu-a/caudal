@@ -11,6 +11,10 @@ type Props = {
   moneda?: string;
   /** 'auto' pinta el ingreso en verde; 'neutro' deja la cifra en Espuma. */
   tono?: 'auto' | 'neutro';
+  /** Color propio, cuando la pantalla necesita uno distinto del semantico. */
+  color?: string;
+  /** El signo sobra cuando la etiqueta ya dice si es ingreso o gasto. */
+  signo?: boolean;
   variante?: 'cifra' | 'display' | 'cifraMedia';
   decimales?: 'siempre' | 'ocultarEnCero';
   /** Linea corta debajo de la cifra: variacion, periodo, aclaracion. */
@@ -26,6 +30,8 @@ export function Cifra({
   valor,
   moneda = 'UYU',
   tono = 'auto',
+  color: colorPropio,
+  signo = true,
   variante = 'cifra',
   decimales = 'siempre',
   pie,
@@ -41,9 +47,11 @@ export function Cifra({
           {etiqueta}
         </Texto>
       ) : null}
-      <Texto variante={variante} color={esIngreso ? color.ingreso : color.gasto}>
+      <Texto
+        variante={variante}
+        color={colorPropio ?? (esIngreso ? color.ingreso : color.gasto)}>
         {formatMoneda(valor, moneda, {
-          signo: esIngreso ? 'siempre' : 'auto',
+          signo: !signo ? 'nunca' : esIngreso ? 'siempre' : 'auto',
           decimales,
         })}
       </Texto>

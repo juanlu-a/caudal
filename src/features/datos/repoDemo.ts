@@ -91,6 +91,8 @@ function sembrar(): Estado {
       kind: 'bank',
       currency: 'UYU',
       last4: null,
+      opening_balance: 0,
+      opening_on: null,
       archived: false,
       created_at: ahora,
     },
@@ -203,6 +205,8 @@ export const repositorio: Repositorio = {
       kind: datos.kind,
       currency: datos.currency ?? estado.perfil.currency,
       last4: datos.last4 ?? null,
+      opening_balance: 0,
+      opening_on: null,
       archived: false,
       created_at: new Date().toISOString(),
     };
@@ -222,8 +226,15 @@ export const repositorio: Repositorio = {
           name: cuenta.name,
           kind: cuenta.kind,
           currency: cuenta.currency,
+          opening_balance: cuenta.opening_balance,
           // El saldo de una cuenta sí incluye las transferencias: la plata se movió.
-          saldo: suyos.reduce((suma, m) => suma + Number(m.amount), 0),
+          // Y arranca del saldo de apertura, que es lo que había antes de lo cargado.
+          // Se redondea porque sumar decimales en coma flotante deja restos:
+          // Postgres usa numeric y no tiene el problema, este almacén sí.
+          saldo:
+            Math.round(
+              suyos.reduce((suma, m) => suma + Number(m.amount), cuenta.opening_balance) * 100,
+            ) / 100,
           movimientos: suyos.length,
           ultimo_movimiento: suyos.map((m) => m.occurred_on).sort().at(-1) ?? null,
         };
@@ -285,7 +296,16 @@ export const repositorio: Repositorio = {
       });
     }
 
-    await guardar({ ...estado, movimientos: [...agregados, ...estado.movimientos] });
+    // El saldo de apertura es lo que había antes del primer movimiento cargado:
+    // sin él la cuenta arranca de cero y no coincide con el banco. Se fija con el
+    // primer extracto y se corrige si después llega uno más viejo.
+    const cuentas = estado.cuentas.map((c) => {
+      if (c.id !== plan.cuentaId || plan.apertura == null || !plan.desde) return c;
+      if (c.opening_on != null && plan.desde >= c.opening_on) return c;
+      return { ...c, opening_balance: plan.apertura, opening_on: plan.desde };
+    });
+
+    await guardar({ ...estado, cuentas, movimientos: [...agregados, ...estado.movimientos] });
     return { importados: agregados.length, omitidos: plan.duplicados, transferencias };
   },
 

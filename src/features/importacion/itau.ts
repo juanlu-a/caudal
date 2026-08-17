@@ -448,7 +448,10 @@ export function leerLinkDeItau(lineas: LineaDePdf[]): Lectura {
     moneda,
     identificador: numero,
     filas,
-    apertura: null,
+    // La consulta no imprime el saldo de apertura, pero se deduce: es el saldo
+    // que dejó la primera fila menos lo que esa fila movió.
+    apertura:
+      filas[0].saldo != null ? redondear(filas[0].saldo - filas[0].monto) : null,
     cierre: filas[filas.length - 1].saldo,
     // Sin saldo de apertura no hay contra qué cuadrar el total: el control se
     // hizo fila por fila contra el saldo corriente.
