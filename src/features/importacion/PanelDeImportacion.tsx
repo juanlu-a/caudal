@@ -6,6 +6,7 @@ import { Cifra } from '../../components/Cifra';
 import { FilaMovimiento } from '../../components/FilaMovimiento';
 import { Panel } from '../../components/Panel';
 import { Texto } from '../../components/Texto';
+import { ModalDeCuentas, type CuentaDetectada } from '../../components/ModalDeCuentas';
 import { ZonaDeArchivo } from '../../components/ZonaDeArchivo';
 import { formatFecha } from '../../lib/format';
 import { color, espacio, radio } from '../../theme';
@@ -50,6 +51,8 @@ export function PanelDeImportacion({ onListo }: Props) {
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<{ importados: number; omitidos: number } | null>(null);
+  const [detectadas, setDetectadas] = useState<CuentaDetectada[] | null>(null);
+  const [elegidas, setElegidas] = useState<Set<string>>(new Set());
 
   const banco = buscarBanco(perfil.data?.bank);
   const seccion: SeccionImportable | null = lectura?.secciones[indice] ?? null;
@@ -76,6 +79,13 @@ export function PanelDeImportacion({ onListo }: Props) {
       setLectura(leido);
       setIndice(0);
       setPlan(null);
+
+      // Un archivo puede traer más de una cuenta: el estado de cuenta viene con
+      // pesos y dólares, y el resumen de tarjeta también. Se muestran todas
+      // juntas en vez de descubrirlas de a una.
+      const delArchivo = cuentasDelArchivo(leido, cuentas.data ?? []);
+      setDetectadas(delArchivo);
+      setElegidas(new Set(delArchivo.filter((d) => !d.yaExiste).map((d) => d.clave)));
     } catch (e) {
       setError(
         e instanceof ErrorDeArchivo
@@ -134,6 +144,26 @@ export function PanelDeImportacion({ onListo }: Props) {
     }
   }
 
+  async function crearLasDetectadas() {
+    if (!detectadas) return;
+    setError(null);
+    try {
+      for (const d of detectadas) {
+        if (d.yaExiste || !elegidas.has(d.clave)) continue;
+        await crearCuenta.mutateAsync({
+          name: d.nombre,
+          kind: d.tipo,
+          currency: d.moneda,
+          last4: d.numero?.slice(-4) ?? null,
+          external_number: d.numero ?? null,
+        });
+      }
+      setDetectadas(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron crear las cuentas.');
+    }
+  }
+
   async function confirmar() {
     if (!plan) return;
     setError(null);
@@ -149,6 +179,25 @@ export function PanelDeImportacion({ onListo }: Props) {
       setError(e instanceof Error ? `No se pudo importar: ${e.message}` : 'No se pudo importar.');
     }
   }
+
+  const modal = (
+    <ModalDeCuentas
+      visible={detectadas != null && detectadas.some((d) => !d.yaExiste)}
+      detectadas={detectadas ?? []}
+      elegidas={elegidas}
+      creando={crearCuenta.isPending}
+      onAlternar={(clave) =>
+        setElegidas((antes) => {
+          const ahora = new Set(antes);
+          if (ahora.has(clave)) ahora.delete(clave);
+          else ahora.add(clave);
+          return ahora;
+        })
+      }
+      onCrear={crearLasDetectadas}
+      onCancelar={() => setDetectadas(null)}
+    />
+  );
 
   if (listo) {
     return (
@@ -167,6 +216,7 @@ export function PanelDeImportacion({ onListo }: Props) {
         <Boton variante="texto" onPress={() => setListo(null)}>
           Traer otro archivo
         </Boton>
+        {modal}
       </View>
     );
   }
@@ -180,6 +230,7 @@ export function PanelDeImportacion({ onListo }: Props) {
             {error}
           </Texto>
         ) : null}
+        {modal}
       </View>
     );
   }
@@ -291,8 +342,41 @@ export function PanelDeImportacion({ onListo }: Props) {
         }}>
         Elegir otro archivo
       </Boton>
+      {modal}
     </View>
   );
+}
+
+/** Las cuentas que trae el archivo, cruzadas con las que ya existen. */
+function cuentasDelArchivo(lectura: Lectura, existentes: Cuenta[]): CuentaDetectada[] {
+  const tipo = lectura.origen === 'tarjeta' ? 'card' : 'bank';
+  const creadas: Cuenta[] = [...existentes];
+
+  return lectura.secciones.map((s) => {
+    const yaEsta = existentes.find(
+      (c) =>
+        c.kind === tipo &&
+        c.currency === s.moneda &&
+        (s.identificador == null ||
+          c.external_number === s.identificador ||
+          c.external_number == null),
+    );
+
+    const nombre = yaEsta?.name ?? nombreSugerido(lectura, s, creadas);
+    // El nombre sugerido mira las que ya hay para no repetirse: las que se van a
+    // crear en esta misma tanda también cuentan.
+    if (!yaEsta) creadas.push({ name: nombre } as Cuenta);
+
+    return {
+      clave: `${tipo}-${s.moneda}-${s.identificador ?? 'sin-numero'}`,
+      nombre,
+      moneda: s.moneda,
+      tipo,
+      numero: s.identificador,
+      movimientos: s.filas.length,
+      yaExiste: yaEsta != null,
+    };
+  });
 }
 
 function Previsualizacion({ plan, cuenta }: { plan: PlanDeImportacion; cuenta: Cuenta | null }) {
