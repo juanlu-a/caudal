@@ -19,6 +19,10 @@ const config: ExpoConfig = {
       // expo-status-bar maneja el estilo desde JS: con la clave en true,
       // RCTStatusBarManager tira error al setearlo.
       UIViewControllerBasedStatusBarAppearance: false,
+      // La carpeta de la app aparece en Archivos: se pueden dejar ahí los
+      // estados de cuenta y traerlos sin pasar por iCloud ni por el mail.
+      UIFileSharingEnabled: true,
+      LSSupportsOpeningDocumentsInPlace: true,
     },
   },
   android: {
@@ -38,6 +42,18 @@ const config: ExpoConfig = {
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   },
   plugins: [
+    [
+      'expo-build-properties',
+      {
+        ios: {
+          // Los frameworks precompilados de Expo arrastran SwiftUICore en sus
+          // .swiftmodule, y el simulador no puede linkearlo: «cannot link
+          // directly with SwiftUICore». Compilando desde el código fuente el
+          // problema no existe. El primer build tarda; los siguientes no.
+          buildReactNativeFromSource: true,
+        },
+      },
+    ],
     'expo-router',
     'expo-secure-store',
     // Apple ID personal gratis: firma para el iPhone propio, con 7 días de vida.
