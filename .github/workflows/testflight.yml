@@ -83,4 +83,5 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           GRUPO: ${{ inputs.grupo || 'Testers Caudal' }}
           RAMA: ${{ github.ref_name }}
+          BUILD: ${{ github.run_number }}
         run: node scripts/repartir-build.mjs
