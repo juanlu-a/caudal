@@ -38,13 +38,6 @@ jobs:
       - name: Verificar que compila
         run: npx tsc --noEmit
 
-      - name: Generar las fuentes
-        # Las instancias de Archivo se cortan del variable con fontTools, así que
-        # no están versionadas como binarios sueltos del build.
-        run: |
-          python3 -m pip install --quiet fonttools
-          npm run fonts
-
       - name: Guardar la clave de App Store Connect
         env:
           ASC_KEY: ${{ secrets.ASC_KEY_P8 }}
