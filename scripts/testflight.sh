@@ -20,6 +20,16 @@ cd "$(dirname "$0")/.."
 : "${ASC_KEY_ID:?falta ASC_KEY_ID}"
 : "${ASC_ISSUER_ID:?falta ASC_ISSUER_ID}"
 
+CLAVE="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+[ -f "$CLAVE" ] || { echo "No está la clave en $CLAVE"; exit 1; }
+
+# Xcode pide y renueva certificados y perfiles con la misma API key, sin depender
+# de que la sesión de Apple ID esté viva en esta Mac.
+AUTH=(-allowProvisioningUpdates
+      -authenticationKeyPath "$CLAVE"
+      -authenticationKeyID "$ASC_KEY_ID"
+      -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+
 ARCHIVO="build/Caudal.xcarchive"
 SALIDA="build/ipa"
 
@@ -33,7 +43,7 @@ xcodebuild -workspace ios/Caudal.xcworkspace \
   -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$ARCHIVO" \
-  -allowProvisioningUpdates \
+  "${AUTH[@]}" \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
   archive
 
@@ -42,7 +52,7 @@ xcodebuild -exportArchive \
   -archivePath "$ARCHIVO" \
   -exportPath "$SALIDA" \
   -exportOptionsPlist scripts/ExportOptions.plist \
-  -allowProvisioningUpdates
+  "${AUTH[@]}"
 
 IPA=$(find "$SALIDA" -name "*.ipa" | head -1)
 echo "==> Subiendo $IPA a App Store Connect"

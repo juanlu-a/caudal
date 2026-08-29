@@ -45,3 +45,6 @@ yarn-error.*
 
 # cache de fuentes
 .cache/
+
+# artefactos de build (.xcarchive, .ipa)
+/build
