@@ -15,6 +15,9 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: 'com.juanabreu.caudal',
     supportsTablet: false,
+    // App Store Connect rechaza subir dos veces el mismo build: este número sube
+    // en cada envío, aunque la versión visible siga igual.
+    buildNumber: '1',
     infoPlist: {
       // expo-status-bar maneja el estilo desde JS: con la clave en true,
       // RCTStatusBarManager tira error al setearlo.
@@ -23,6 +26,9 @@ const config: ExpoConfig = {
       // estados de cuenta y traerlos sin pasar por iCloud ni por el mail.
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
+      // La app solo usa HTTPS, que es criptografía exenta. Declararlo evita que
+      // App Store Connect pregunte por exportación en cada envío.
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {

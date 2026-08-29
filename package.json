@@ -46,7 +46,8 @@
     "icons": "node scripts/build-icons.mjs",
     "ios:device": "expo run:ios --device",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/parche-pdfjs.mjs"
+    "postinstall": "node scripts/parche-pdfjs.mjs",
+    "testflight": "bash scripts/testflight.sh"
   },
   "private": true
 }

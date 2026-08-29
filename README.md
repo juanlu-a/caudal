@@ -138,3 +138,21 @@ src/
 supabase/migrations/  esquema con RLS
 scripts/              build-fonts.py · build-icons.mjs
 ```
+
+## TestFlight
+
+Requiere la cuenta paga de Apple Developer. La primera vez hay que crear la app en
+App Store Connect con el bundle id `com.juanabreu.caudal`, y una clave de la
+App Store Connect API (*Users and Access → Integrations*), que se guarda en
+`~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8`.
+
+```sh
+export APPLE_TEAM_ID=...     # el equipo pago
+export ASC_KEY_ID=...
+export ASC_ISSUER_ID=...
+npm run testflight
+```
+
+El script regenera el proyecto nativo, archiva, exporta el `.ipa` y lo sube. El
+`buildNumber` de `app.config.ts` tiene que subir en cada envío: App Store Connect
+rechaza dos builds con el mismo número.

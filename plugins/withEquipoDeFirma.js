@@ -6,13 +6,15 @@ const { withXcodeProject } = require('expo/config-plugins');
  * `expo prebuild` regenera ios/ desde cero, asi que sin esto hay que volver a
  * elegir el equipo a mano cada vez que se regenera el proyecto nativo.
  *
- * VPNXQ8K2P8 es el Apple ID personal (team "Juan Abreu"), que es gratis: firma
- * para el telefono propio y el build vence a los 7 dias. Cuando haya cuenta
- * paga, se cambia el id aca.
+ * Por defecto usa el Apple ID personal (team "Juan Abreu"), que es gratis: firma
+ * para el telefono propio y el build vence a los 7 dias. Para TestFlight se
+ * exporta APPLE_TEAM_ID con el equipo pago y ese gana.
  */
 module.exports = function withEquipoDeFirma(config, { teamId } = {}) {
   return withXcodeProject(config, (cfg) => {
-    const equipo = teamId ?? process.env.APPLE_TEAM_ID;
+    // El entorno gana sobre la config: así se firma con el equipo pago para
+    // TestFlight sin tocar el código, y sin él sigue el Apple ID personal.
+    const equipo = process.env.APPLE_TEAM_ID ?? teamId;
     if (!equipo) return cfg;
 
     const proyecto = cfg.modResults;
