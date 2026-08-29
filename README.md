@@ -11,7 +11,7 @@ Tu plata tiene un caudal: la app solo lo hace visible.
 |---|---|
 | App | Expo SDK 57 · React Native 0.86 · expo-router v6 (rutas por archivo) |
 | Navegación | `NativeTabs` — `UITabBarController` real, con Liquid Glass del sistema en iOS 26 |
-| Backend | Supabase (Postgres + Auth), con RLS en las tres tablas |
+| Backend | Supabase (Postgres + Auth), con RLS en todas las tablas |
 | Datos | `@tanstack/react-query` |
 | Marca | Sistema de diseño derivado del manual, en `src/theme` |
 
@@ -54,12 +54,27 @@ de la rampa cuando alguien crea la cuenta.
 
 ## Importar del banco
 
-Cuenta → **Importar del banco**. Se elige qué es el archivo (estado de cuenta o resumen
-de tarjeta), a qué cuenta va, y se trae el Excel o CSV tal cual lo baja el banco.
+**Agregar movimiento → Desde el banco**, y se trae el PDF tal cual lo descarga el banco.
+No hay que decir qué documento es: entre los lectores del banco elegido, el que lo
+reconoce es el correcto. Hoy se leen tres formatos de Itaú, y el archivo se lee dentro
+del teléfono — los estados de cuenta no salen del dispositivo.
 
-El parser (`src/features/importacion/`) busca el encabezado aunque haya filas de título
-arriba, entiende columnas de débito/crédito o una sola de importe con signo, y fechas
-en `dd/mm/aaaa`, serie de Excel o `Date`.
+| Archivo | Qué trae |
+|---|---|
+| Estado de cuenta mensual | Secciones en pesos y en dólares, con saldo de apertura y cierre |
+| Resumen de tarjeta | Consumos y pagos, con columna de pesos y de dólares |
+| Consulta de Itaú Link | El mes en curso, con débito y crédito en columnas separadas |
+
+El texto plano de un PDF no alcanza: el resumen de tarjeta sale con las descripciones de
+un lado y los importes del otro. `src/features/importacion/pdf.ts` reconstruye la tabla
+con las coordenadas que da pdf.js, agrupando por altura y ordenando por posición.
+
+**El signo no está escrito en el PDF**: sale de cómo se movió el saldo corriente, o de en
+qué columna cae el importe. Eso permite controlar la lectura entera contra el propio
+banco, y ese cuadre se muestra antes de importar.
+
+Al leer un archivo, un modal ofrece crear las cuentas que trajo, con el nombre y la
+moneda sacados del propio PDF.
 
 ### La tarjeta de crédito
 
@@ -68,7 +83,8 @@ veces: como el pago de la tarjeta y como las compras que lo componen. Por eso ca
 movimiento pertenece a una cuenta y el pago se marca `is_transfer`:
 
 ```
-saldo de una cuenta = todos sus movimientos, transferencias incluidas
+saldo de una cuenta = último saldo confirmado por el banco
+                      + movimientos posteriores a esa fecha
 gasto del mes       = movimientos negativos que NO son transferencia
 ```
 
@@ -79,6 +95,15 @@ la pantalla de importación.
 
 No se inventa la contrapartida del pago — cada pata sale de una fila real de un archivo.
 Inventarla haría que al importar el resumen el mismo pago entrara dos veces.
+
+### Los traspasos
+
+«TRASPASO DE 3650979» y «TRASPASO A 2359042» se ven igual pero no lo son: el primero es
+plata que pasa entre cuentas propias, el segundo es plata que se le manda a alguien. La
+cuenta guarda su número tal como lo escribe el banco y con eso se distinguen. El primero
+no es ingreso ni gasto; el segundo sí.
+
+### Duplicados
 
 Reimportar el mismo archivo no duplica nada: cada fila tiene una clave estable
 (cuenta, fecha, importe, descripción y orden entre filas idénticas) con índice único en
@@ -101,8 +126,7 @@ La primera vez:
 
 Después, cuando la app deje de abrir a los 7 días, alcanza con repetir el paso 3.
 
-Para pasar a TestFlight hace falta la cuenta paga de Apple Developer (US$ 99/año)
-y agregar `eas.json`; el código no cambia.
+Con la cuenta paga se sube a TestFlight — ver más abajo.
 
 ## El manual de marca manda
 
