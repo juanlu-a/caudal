@@ -1,0 +1,83 @@
+name: TestFlight
+
+# Cada merge a main sube un build al grupo público, que es el que reciben todos
+# los testers. Una rama se puede subir a mano desde la pestaña Actions y va solo
+# al grupo interno: sirve para probar una feature sin que le llegue a nadie más.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      grupo:
+        description: A qué grupo de TestFlight va
+        type: choice
+        default: Interno
+        options: [Interno, Testers Caudal]
+
+concurrency:
+  # Dos builds a la vez pelearían por el número de build.
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  subir:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar que compila
+        run: npx tsc --noEmit
+
+      - name: Generar las fuentes
+        # Las instancias de Archivo se cortan del variable con fontTools, así que
+        # no están versionadas como binarios sueltos del build.
+        run: |
+          python3 -m pip install --quiet fonttools
+          npm run fonts
+
+      - name: Guardar la clave de App Store Connect
+        env:
+          ASC_KEY: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$ASC_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      - name: Numerar el build
+        # El número tiene que subir siempre: el de la corrida sirve y nunca repite.
+        run: |
+          node -e "
+            const fs = require('fs');
+            const archivo = 'app.config.ts';
+            const t = fs.readFileSync(archivo, 'utf8');
+            fs.writeFileSync(archivo, t.replace(/buildNumber: '[^']*'/, \"buildNumber: '${{ github.run_number }}'\"));
+          "
+          grep buildNumber app.config.ts
+
+      - name: Archivar y subir
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
+        run: npm run testflight
+
+      - name: Repartir a los testers
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          GRUPO: ${{ inputs.grupo || 'Testers Caudal' }}
+          RAMA: ${{ github.ref_name }}
+        run: node scripts/repartir-build.mjs

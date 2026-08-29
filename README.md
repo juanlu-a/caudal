@@ -27,6 +27,18 @@ npm run ios:device          # iPhone por cable
 
 `NativeTabs` no funciona en Expo Go: hay que correr el dev build.
 
+Para el **simulador** hay que regenerar el proyecto nativo desde fuente:
+
+```sh
+PARA_SIMULADOR=1 npx expo prebuild -p ios --no-clean && (cd ios && pod install)
+npx expo run:ios
+```
+
+Los frameworks precompilados de Expo arrastran `SwiftUICore` en sus `.swiftmodule` y
+el simulador no puede linkearlo. Para dispositivo no pasa, y ahí los precompilados
+son varias veces más rápidos: por eso el build de TestFlight y el de CI no llevan
+esa variable.
+
 ### Modo demo
 
 Sin `.env` la app arranca igual, contra un almacén local en AsyncStorage sembrado con

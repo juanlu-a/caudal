@@ -55,8 +55,14 @@ const config: ExpoConfig = {
           // Los frameworks precompilados de Expo arrastran SwiftUICore en sus
           // .swiftmodule, y el simulador no puede linkearlo: «cannot link
           // directly with SwiftUICore». Compilando desde el código fuente el
-          // problema no existe. El primer build tarda; los siguientes no.
-          buildReactNativeFromSource: true,
+          // problema no existe.
+          //
+          // Pero eso solo pasa en el simulador: para dispositivo los
+          // precompilados andan bien y el build es varias veces más rápido, que
+          // es lo que se archiva y lo que corre en CI. Por eso se decide acá:
+          //   PARA_SIMULADOR=1 npx expo prebuild -p ios   → desde fuente
+          //   npx expo prebuild -p ios                    → precompilados
+          buildReactNativeFromSource: process.env.PARA_SIMULADOR === '1',
         },
       },
     ],
