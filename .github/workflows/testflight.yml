@@ -21,11 +21,21 @@ concurrency:
 
 jobs:
   subir:
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Elegir Xcode
+        # El proyecto necesita Swift 6.2, que viene con Xcode 26. La imagen del
+        # runner trae varias versiones y la que está seleccionada puede ser vieja.
+        run: |
+          ls -d /Applications/Xcode*.app
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
+          xcodebuild -version
+          swift --version
 
       - uses: actions/setup-node@v4
         with:
