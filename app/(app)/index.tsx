@@ -58,12 +58,14 @@ export default function Mes() {
   return (
     <View style={styles.pantalla}>
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
+        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={[
           styles.contenido,
-          // La barra de tabs y su accesorio de vidrio flotan sobre el contenido:
-          // este aire evita que tapen la ultima fila.
-          { paddingTop: insets.top + espacio[4], paddingBottom: insets.bottom + 120 },
+          // Arriba, solo librar la isla: el encabezado es una fila de iconos, no
+          // un titulo, y no necesita el aire de una barra de navegacion.
+          // Abajo, la barra de tabs y su accesorio de vidrio flotan sobre el
+          // contenido: este aire evita que tapen la ultima fila.
+          { paddingTop: insets.top + espacio[2], paddingBottom: insets.bottom + 120 },
         ]}
         refreshControl={
           <RefreshControl
@@ -172,7 +174,7 @@ export default function Mes() {
                 <Boton
                   variante="secundario"
                   ancho="contenido"
-                  onPress={() => router.push('/nuevo')}>
+                  onPress={() => router.push('/agregar?modo=importar')}>
                   Traer del banco
                 </Boton>
               }

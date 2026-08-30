@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
   },
   accion: {
     marginTop: espacio[4],
+    alignItems: 'flex-start',
   },
   saldos: {
     gap: espacio[3],
