@@ -10,6 +10,7 @@ type Props = {
   variante?: 'principal' | 'secundario' | 'texto' | 'destructivo';
   cargando?: boolean;
   deshabilitado?: boolean;
+  /** 'contenido' encoge al texto y deja la alineacion al contenedor. */
   ancho?: 'completo' | 'contenido';
 };
 
@@ -45,7 +46,9 @@ export function Boton({
         styles.base,
         {
           backgroundColor: fondo,
-          alignSelf: ancho === 'completo' ? 'stretch' : 'flex-start',
+          // 'auto' hereda el alignItems del contenedor: asi el mismo boton cae a
+          // la izquierda en un panel y centrado en un estado vacio.
+          alignSelf: ancho === 'completo' ? 'stretch' : 'auto',
           borderWidth: variante === 'destructivo' ? StyleSheet.hairlineWidth : 0,
           borderColor: color.error,
         },

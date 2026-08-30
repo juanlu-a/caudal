@@ -73,13 +73,13 @@ export default function Movimientos() {
       <FlashList
         data={items}
         keyExtractor={(item) => item.clave}
-        contentInsetAdjustmentBehavior="automatic"
+        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
           paddingHorizontal: margenPantalla,
           paddingBottom: insets.bottom + 120,
         }}
         ListHeaderComponent={
-          <View style={[styles.encabezado, { paddingTop: insets.top + espacio[4] }]}>
+          <View style={[styles.encabezado, { paddingTop: insets.top + espacio[2] }]}>
             <View style={styles.selectorMes}>
               <FlechaMes direccion="anterior" onPress={() => setOffsetMes((o) => o - 1)} />
               <Texto variante="titulo1">{formatMes(fechaMes)}</Texto>
@@ -123,7 +123,7 @@ export default function Movimientos() {
                   <Boton
                     variante="secundario"
                     ancho="contenido"
-                    onPress={() => router.push('/nuevo')}>
+                    onPress={() => router.push('/agregar?modo=importar')}>
                     Traer del banco
                   </Boton>
                 )

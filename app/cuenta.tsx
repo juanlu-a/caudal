@@ -2,16 +2,16 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Boton } from '../../src/components/Boton';
-import { Campo } from '../../src/components/Campo';
-import { Desplegable } from '../../src/components/Desplegable';
-import { Panel } from '../../src/components/Panel';
-import { Texto } from '../../src/components/Texto';
-import { useAuth } from '../../src/features/auth/AuthProvider';
-import { BANCOS, BANCO_POR_DEFECTO } from '../../src/features/importacion/bancos';
-import { useActualizarPerfil, usePerfil, useSaldos } from '../../src/features/movimientos/queries';
-import { formatFecha, formatMoneda } from '../../src/lib/format';
-import { color, espacio, margenPantalla, radio } from '../../src/theme';
+import { Boton } from '../src/components/Boton';
+import { Campo } from '../src/components/Campo';
+import { Desplegable } from '../src/components/Desplegable';
+import { Panel } from '../src/components/Panel';
+import { Texto } from '../src/components/Texto';
+import { useAuth } from '../src/features/auth/AuthProvider';
+import { BANCOS, BANCO_POR_DEFECTO } from '../src/features/importacion/bancos';
+import { useActualizarPerfil, usePerfil, useSaldos } from '../src/features/movimientos/queries';
+import { formatFecha, formatMoneda } from '../src/lib/format';
+import { color, espacio, margenPantalla, radio } from '../src/theme';
 
 const MONEDAS = ['UYU', 'USD', 'ARS', 'EUR', 'BRL'] as const;
 
@@ -41,15 +41,15 @@ export default function Cuenta() {
 
   return (
     <ScrollView
+      // Ya no vive en una tab: se pushea con encabezado nativo, que ajusta el
+      // inset superior solo. El de abajo queda porque tampoco hay barra de tabs.
       contentInsetAdjustmentBehavior="automatic"
-      // Sin color propio, el contenedor de la tab nativa se ve blanco detras.
       style={styles.pantalla}
       contentContainerStyle={[
         styles.contenido,
-        { paddingTop: insets.top + espacio[4], paddingBottom: insets.bottom + 120 },
+        { paddingTop: espacio[4], paddingBottom: insets.bottom + espacio[6] },
       ]}>
       <View>
-        <Texto variante="micro">Cuenta</Texto>
         <Texto variante="titulo1">{perfil.data?.display_name || 'Sin nombre'}</Texto>
         <Texto variante="secundario">
           {demo ? 'Datos guardados solo en este teléfono' : session?.user.email}
@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
   },
   accion: {
     marginTop: espacio[4],
+    alignItems: 'flex-start',
   },
   saldos: {
     gap: espacio[3],
