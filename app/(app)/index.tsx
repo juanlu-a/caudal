@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Boton } from '../../src/components/Boton';
+import { BotonPerfil } from '../../src/components/BotonPerfil';
 import { Cifra } from '../../src/components/Cifra';
 import { EstadoVacio } from '../../src/components/EstadoVacio';
 import { FilaMovimiento } from '../../src/components/FilaMovimiento';
@@ -76,17 +77,20 @@ export default function Mes() {
         }>
         <View style={styles.encabezado}>
           <Isotipo tamano={28} />
-          <View style={styles.selectorMes}>
-            <Flecha
-              hacia="anterior"
-              onPress={() => setDesplazamiento((d) => d - 1)}
-            />
-            <Texto variante="micro">{formatMes(fechaDelMes)}</Texto>
-            <Flecha
-              hacia="siguiente"
-              onPress={() => setDesplazamiento((d) => Math.min(0, d + 1))}
-              deshabilitada={desplazamiento >= 0}
-            />
+          <View style={styles.derecha}>
+            <View style={styles.selectorMes}>
+              <Flecha
+                hacia="anterior"
+                onPress={() => setDesplazamiento((d) => d - 1)}
+              />
+              <Texto variante="micro">{formatMes(fechaDelMes)}</Texto>
+              <Flecha
+                hacia="siguiente"
+                onPress={() => setDesplazamiento((d) => Math.min(0, d + 1))}
+                deshabilitada={desplazamiento >= 0}
+              />
+            </View>
+            <BotonPerfil />
           </View>
         </View>
 
@@ -222,6 +226,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  derecha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espacio[2],
   },
   selectorMes: {
     flexDirection: 'row',

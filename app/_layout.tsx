@@ -94,6 +94,14 @@ function Navegacion() {
           ...encabezado,
         }}
       />
+      <Stack.Screen
+        name="cuenta"
+        options={{
+          headerShown: true,
+          title: 'Cuenta',
+          ...encabezado,
+        }}
+      />
     </Stack>
   );
 }
