@@ -35,6 +35,13 @@ type Props = {
  * tener creada la cuenta antes de saber siquiera qué trae el PDF, y si no la
  * tenías la pantalla no hacía nada.
  */
+type PlanArmado = {
+  lectura: Lectura;
+  seccion: SeccionImportable;
+  cuenta: Cuenta;
+  plan: PlanDeImportacion;
+};
+
 export function PanelDeImportacion({ onListo }: Props) {
   const perfil = usePerfil();
   const cuentas = useCuentas();
@@ -46,7 +53,12 @@ export function PanelDeImportacion({ onListo }: Props) {
   const [lectura, setLectura] = useState<Lectura | null>(null);
   const [indice, setIndice] = useState(0);
   const [cuentaId, setCuentaId] = useState<string | null>(null);
-  const [plan, setPlan] = useState<PlanDeImportacion | null>(null);
+  // El plan se guarda junto con el archivo, la sección y la cuenta con los que
+  // se armó, y en el render vale solo si esos tres siguen siendo los mismos.
+  // Así deja de valer solo al cambiar cualquiera de ellos, en vez de tener que
+  // acordarse de borrarlo, y mientras se recalcula no se muestra el de la
+  // cuenta anterior.
+  const [calculado, setCalculado] = useState<PlanArmado | null>(null);
   const [llevaTarjeta, setLlevaTarjeta] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +78,13 @@ export function PanelDeImportacion({ onListo }: Props) {
     : undefined;
   const cuenta = compatibles.find((c) => c.id === cuentaId) ?? porNumero ?? compatibles[0] ?? null;
 
+  const plan =
+    calculado?.lectura === lectura &&
+    calculado?.seccion === seccion &&
+    calculado?.cuenta === cuenta
+      ? calculado.plan
+      : null;
+
   async function elegir() {
     setError(null);
     setLeyendo(true);
@@ -78,7 +97,6 @@ export function PanelDeImportacion({ onListo }: Props) {
       setArchivo(elegido.nombre);
       setLectura(leido);
       setIndice(0);
-      setPlan(null);
 
       // Un archivo puede traer más de una cuenta: el estado de cuenta viene con
       // pesos y dólares, y el resumen de tarjeta también. Se muestran todas
@@ -100,10 +118,7 @@ export function PanelDeImportacion({ onListo }: Props) {
   // Con archivo y cuenta, se cruza contra lo que ya está guardado.
   useEffect(() => {
     let vivo = true;
-    if (!lectura || !seccion || !cuenta) {
-      setPlan(null);
-      return;
-    }
+    if (!lectura || !seccion || !cuenta) return;
 
     (async () => {
       const armar = (clavesExistentes: Set<string>) =>
@@ -117,7 +132,7 @@ export function PanelDeImportacion({ onListo }: Props) {
 
       const preliminar = armar(new Set());
       const existentes = await repo.clavesExistentes(preliminar.movimientos.map((m) => m.clave));
-      if (vivo) setPlan(armar(existentes));
+      if (vivo) setCalculado({ lectura, seccion, cuenta, plan: armar(existentes) });
     })().catch((e) => {
       if (vivo) setError(e instanceof Error ? e.message : 'No se pudo preparar la importación.');
     });
@@ -174,7 +189,6 @@ export function PanelDeImportacion({ onListo }: Props) {
       });
       setListo({ importados: resultado.importados, omitidos: resultado.omitidos });
       setLectura(null);
-      setPlan(null);
     } catch (e) {
       setError(e instanceof Error ? `No se pudo importar: ${e.message}` : 'No se pudo importar.');
     }
@@ -337,7 +351,6 @@ export function PanelDeImportacion({ onListo }: Props) {
         variante="texto"
         onPress={() => {
           setLectura(null);
-          setPlan(null);
           setArchivo(null);
         }}>
         Elegir otro archivo

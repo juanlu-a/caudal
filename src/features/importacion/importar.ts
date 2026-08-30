@@ -62,7 +62,7 @@ const PAGO_DE_TARJETA =
  * Pistas para adivinar la categoria por el nombre del comercio. Es una ayuda,
  * no una sentencia: la categoria se puede cambiar despues movimiento por movimiento.
  */
-const PISTAS: Array<[RegExp, string]> = [
+const PISTAS: [RegExp, string][] = [
   [/super|tienda\s+inglesa|disco|devoto|geant|tata|macro|frog|carrasco|kinko|almacen|carniceria|verduleria|panaderia/, 'Alimentos'],
   [/ancap|petrobras|axion|shell|esso|nafta|combustible|uber|cabify|taxi|omnibus|cutcsa|copsa|stm|peaje/, 'Transporte'],
   [/alquiler|ute|ose|antel|gas|contribucion|inmobiliaria|expensas|comun/, 'Vivienda'],

@@ -1,0 +1,33 @@
+name: CI
+
+# La misma verificación que corre antes de un build de TestFlight, pero sola y
+# en dos minutos. En main y staging no corre acá: ahí ya la corre TestFlight y
+# duplicarla solo agrega un check redundante al commit.
+on:
+  pull_request:
+    branches: [main, staging]
+  push:
+    branches-ignore: [main, staging]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test

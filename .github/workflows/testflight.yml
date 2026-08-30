@@ -1,72 +1,106 @@
 name: TestFlight
 
-# Cada merge a main sube un build al grupo público, que es el que reciben todos
-# los testers. Una rama se puede subir a mano desde la pestaña Actions y va solo
-# al grupo interno: sirve para probar una feature sin que le llegue a nadie más.
+# Cada rama larga tiene su público:
+#
+#   staging → grupo «Equipo»   (interno, solo nosotros, sin revisión de Apple)
+#   main    → grupo «Testers»  (externo, el link público)
+#
+# Y desde la pestaña Actions se puede subir cualquier rama eligiendo a dónde va,
+# que es cómo se prueba una feature sin que le llegue a nadie de afuera.
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   workflow_dispatch:
     inputs:
-      grupo:
-        description: A qué grupo de TestFlight va
+      destino:
+        description: A qué grupo va el build
         type: choice
-        default: Interno
-        options: [Interno, Testers Caudal]
+        default: interno
+        options: [interno, externo]
 
 concurrency:
-  # Dos builds a la vez pelearían por el número de build.
-  group: testflight
+  # Por rama, y sin cancelar: un build a medio subir deja a App Store Connect
+  # con un número usado y sin binario.
+  group: testflight-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   subir:
     runs-on: macos-latest
-    timeout-minutes: 60
+    # Compilar React Native desde cero en un runner de Apple no baja de 40 min.
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Elegir Xcode
-        # El proyecto necesita Swift 6.2, que viene con Xcode 26. La imagen del
-        # runner trae varias versiones y la que está seleccionada puede ser vieja.
-        run: |
-          ls -d /Applications/Xcode*.app
-          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
-          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
-          xcodebuild -version
-          swift --version
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Instalar dependencias
-        run: npm ci
+      - name: Elegir el Xcode más nuevo
+        # El proyecto pide Swift 6.2 (Xcode 26). La imagen del runner trae varias
+        # versiones y la seleccionada por defecto puede ser anterior.
+        run: |
+          XCODE=$(find /Applications -maxdepth 1 -name 'Xcode_*.app' | sort -V | tail -1)
+          echo "==> $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
 
-      - name: Verificar que compila
-        run: npx tsc --noEmit
+      - run: npm ci
+
+      # Lo barato primero: no tiene sentido ocupar tres cuartos de hora de runner
+      # para descubrir al final que había un error de tipos.
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
 
       - name: Guardar la clave de App Store Connect
         env:
-          ASC_KEY: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          printf '%s' "$ASC_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          RUTA="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s' "$ASC_KEY_P8" > "$RUTA"
+          chmod 600 "$RUTA"
+          # $RUNNER_TEMP se borra al terminar el job: la clave no queda en la
+          # imagen ni en el árbol del repo.
+          echo "ASC_KEY_PATH=$RUTA" >> "$GITHUB_ENV"
+
+      - name: Elegir el grupo
+        env:
+          DESTINO: ${{ inputs.destino }}
+          RAMA: ${{ github.ref_name }}
+        run: |
+          # En un push no hay input: manda la rama.
+          destino="${DESTINO:-}"
+          if [ -z "$destino" ]; then
+            if [ "$RAMA" = "main" ]; then destino=externo; else destino=interno; fi
+          fi
+          if [ "$destino" = externo ]; then
+            echo "GRUPO=Testers" >> "$GITHUB_ENV"
+            echo "INTERNO=" >> "$GITHUB_ENV"
+          else
+            echo "GRUPO=Equipo" >> "$GITHUB_ENV"
+            echo "INTERNO=--internal" >> "$GITHUB_ENV"
+          fi
+          echo "==> $destino"
+
+      - name: Generar el proyecto nativo
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
+        run: |
+          # Sin PARA_SIMULADOR: para dispositivo van los frameworks precompilados,
+          # que son varias veces más rápidos de compilar.
+          npx expo prebuild --platform ios --no-install
+          cd ios && pod install
 
       - name: Numerar el build
-        # El número tiene que subir siempre: el de la corrida sirve y nunca repite.
-        run: |
-          node -e "
-            const fs = require('fs');
-            const archivo = 'app.config.ts';
-            const t = fs.readFileSync(archivo, 'utf8');
-            fs.writeFileSync(archivo, t.replace(/buildNumber: '[^']*'/, \"buildNumber: '${{ github.run_number }}'\"));
-          "
-          grep buildNumber app.config.ts
+        # Fecha y hora en UTC: siempre sube, nunca repite, y se lee de un vistazo
+        # en App Store Connect. El número de corrida no sirve porque se reinicia
+        # si se recrea el workflow.
+        run: echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
 
       - name: Archivar y subir
         env:
@@ -81,7 +115,13 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          GRUPO: ${{ inputs.grupo || 'Testers Caudal' }}
           RAMA: ${{ github.ref_name }}
-          BUILD: ${{ github.run_number }}
-        run: node scripts/repartir-build.mjs
+          ASUNTO: ${{ github.event.head_commit.message }}
+        run: |
+          # Solo la primera línea del mensaje: el cuerpo del commit no le dice
+          # nada a quien abre TestFlight.
+          NOTAS="$(printf '%s' "$ASUNTO" | head -1)"
+          [ -z "$NOTAS" ] && NOTAS="Build de $RAMA"
+          ARGS=(--build-number "$BUILD_NUMBER" --group "$GRUPO" --notes "$NOTAS ($RAMA)")
+          [ -n "$INTERNO" ] && ARGS+=("$INTERNO")
+          node scripts/testflight-distribute.mjs "${ARGS[@]}"
