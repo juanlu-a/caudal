@@ -143,41 +143,34 @@ console.log(`✓ build ${numero} asignado a «${nombreGrupo}»`);
 
 // ------------------------------------------------- dejar uno solo a la vista
 
-const delGrupo = await asc(
-  'GET',
-  `/v1/betaGroups/${grupo.id}/builds?limit=200&include=betaAppReviewSubmission`,
-);
-const revisiones = Object.fromEntries(
-  (delGrupo.datos?.included ?? [])
-    .filter((x) => x.type === 'betaAppReviewSubmissions')
-    .map((x) => [x.id, x.attributes.betaReviewState]),
-);
+const delGrupo = await asc('GET', `/v1/betaGroups/${grupo.id}/builds?limit=200`);
+// Una lectura que falla no es un grupo vacío: si no se sabe qué hay, no se
+// toca nada y se dice. Antes esto se tragaba un 400 y no limpiaba nunca.
+if (!Array.isArray(delGrupo.datos?.data)) {
+  fallar(`no se pudo ver qué builds tiene «${nombreGrupo}»: ${motivo(delGrupo)}`);
+}
 
 const SE_CONSERVAN = ['APPROVED', 'WAITING_FOR_REVIEW', 'IN_REVIEW'];
 
-/**
- * En qué estado de revisión está un build del grupo. Sale del include, y si por
- * lo que sea no vino, se pregunta: quitar del grupo externo el único build que
- * la gente puede instalar es peor que una llamada de más.
- */
-async function estadoDeRevision(b) {
-  const delInclude = revisiones[b.relationships?.betaAppReviewSubmission?.data?.id];
-  if (delInclude) return delInclude;
-
+/** En qué estado de Beta App Review está un build. */
+async function seConserva(b) {
   const r = await asc('GET', `/v1/builds/${b.id}/betaAppReviewSubmission`);
   if (!r.ok) {
+    // Ante la duda se deja: quitar del grupo externo el único build instalable
+    // deja el link público sin nada, que es peor que un build de más.
     aviso(`no se pudo ver la revisión del build ${b.attributes.version}: se deja en el grupo`);
-    return 'APPROVED';
+    return true;
   }
-  return r.datos?.data?.attributes?.betaReviewState ?? null;
+  return SE_CONSERVAN.includes(r.datos?.data?.attributes?.betaReviewState);
 }
 
-const otros = (delGrupo.datos?.data ?? []).filter((b) => b.id !== build.id);
+const otros = delGrupo.datos.data.filter((b) => b.id !== build.id);
 const aQuitar = [];
 for (const b of otros) {
   // En el externo se conservan el último aprobado —para que el link no quede
-  // vacío mientras el nuevo espera— y los que están en revisión.
-  if (!esInterno && SE_CONSERVAN.includes(await estadoDeRevision(b))) continue;
+  // vacío mientras el nuevo espera— y los que están en revisión. En el interno
+  // no hay revisión que valga: se instala el nuevo y listo.
+  if (!esInterno && (await seConserva(b))) continue;
   aQuitar.push(b);
 }
 
@@ -185,8 +178,12 @@ if (aQuitar.length) {
   const r = await asc('DELETE', `/v1/betaGroups/${grupo.id}/relationships/builds`, {
     data: aQuitar.map((b) => ({ type: 'builds', id: b.id })),
   });
-  if (r.ok) console.log(`✓ quitados ${aQuitar.length} builds viejos del grupo`);
-  else aviso(`no se pudieron quitar los builds viejos: ${motivo(r)}`);
+  if (!r.ok) fallar(`no se pudieron quitar los builds viejos: ${motivo(r)}`);
+  console.log(
+    `✓ quitados de «${nombreGrupo}»: ${aQuitar.map((b) => b.attributes.version).join(', ')}`,
+  );
+} else {
+  console.log(`✓ «${nombreGrupo}» ya no tenía otros builds`);
 }
 
 // --------------------------------------------------------------- revisión
