@@ -82,7 +82,12 @@ export function motivo(respuesta) {
   return `${e.status} ${e.code}: ${e.detail ?? e.title}`;
 }
 
-if (process.argv[2]) {
+// Como CLI, para preguntarle cualquier cosa a la API a mano:
+//   node scripts/asc.mjs GET '/v1/apps?filter[bundleId]=com.juanabreu.caudal'
+//
+// El guardia no es decorativo: sin él esto corre también al importar el módulo,
+// y se come los argumentos de quien lo importó.
+if (import.meta.filename === process.argv[1] && process.argv[2]) {
   const [, , metodo, ruta, cuerpo] = process.argv;
   const r = await asc(metodo, ruta, cuerpo ? JSON.parse(cuerpo) : undefined);
   console.log(r.estado);

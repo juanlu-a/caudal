@@ -230,7 +230,8 @@ escritas a mano — los extractos de verdad no entran en el repo.
 ```sh
 export APPLE_TEAM_ID=VPNXQ8K2P8
 export ASC_KEY_ID=... ASC_ISSUER_ID=...
-# la clave, en ~/.private_keys/AuthKey_$ASC_KEY_ID.p8 (o ASC_KEY_PATH)
+# la clave: se busca sola en ~/.private_keys, ~/private_keys y
+# ~/.appstoreconnect/private_keys, o se apunta con ASC_KEY_PATH
 
 npx expo prebuild --platform ios --no-install && (cd ios && pod install)
 npm run testflight
