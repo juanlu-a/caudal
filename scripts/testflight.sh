@@ -24,9 +24,11 @@ PLIST="ios/$ESQUEMA/Info.plist"
 ARCHIVO="build/$ESQUEMA.xcarchive"
 SALIDA="build/ipa"
 
-# La fecha y hora siempre sube y nunca se repite, que es todo lo que App Store
-# Connect pide del número de build.
-BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
+# La fecha y hora en UTC siempre sube y nunca se repite, que es todo lo que App
+# Store Connect pide del número de build. Con segundos y no con minutos: dos
+# ramas que se mergean una detrás de la otra caen en el mismo minuto, y el
+# segundo build se rechaza por número repetido.
+BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M%S)}"
 
 # Expo escribe CFBundleVersion como literal en el Info.plist, así que pasarle
 # CURRENT_PROJECT_VERSION a xcodebuild no alcanza: hay que tocar el plist.

@@ -201,9 +201,11 @@ en `main` es un merge más, y sube igual.
 
 ### Números de build
 
-`AAAAMMDDhhmm` en UTC, puesto por `scripts/testflight.sh` sobre el `Info.plist` ya
-generado. Siempre sube y nunca repite, que es todo lo que App Store Connect pide.
-El número de corrida de Actions no servía: se reinicia si se recrea el workflow.
+`AAAAMMDDhhmmss` en UTC, puesto por `scripts/testflight.sh` sobre el `Info.plist`
+ya generado. Siempre sube y nunca repite, que es todo lo que App Store Connect
+pide. El número de corrida de Actions no servía: se reinicia si se recrea el
+workflow. Los segundos tampoco sobran: al promover, el merge a `staging` y el de
+`staging` a `main` caen en el mismo minuto.
 
 Expo escribe `CFBundleVersion` como literal al hacer prebuild, así que pasarle
 `CURRENT_PROJECT_VERSION` a `xcodebuild` no alcanza — hay que tocar el plist.

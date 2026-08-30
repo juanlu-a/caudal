@@ -100,7 +100,11 @@ jobs:
         # Fecha y hora en UTC: siempre sube, nunca repite, y se lee de un vistazo
         # en App Store Connect. El número de corrida no sirve porque se reinicia
         # si se recrea el workflow.
-        run: echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
+        #
+        # Con segundos: al promover, el merge a `staging` y el de `staging` a
+        # `main` pueden caer en el mismo minuto, y ahí el segundo build se
+        # rechazaría por número repetido.
+        run: echo "BUILD_NUMBER=$(date -u +%Y%m%d%H%M%S)" >> "$GITHUB_ENV"
 
       - name: Archivar y subir
         env:
