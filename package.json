@@ -33,7 +33,10 @@
   },
   "devDependencies": {
     "@types/aes-js": "^3.1.4",
+    "@types/node": "^26.4.0",
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
     "sharp": "^0.35.3",
     "typescript": "~6.0.3"
   },
@@ -47,7 +50,9 @@
     "ios:device": "expo run:ios --device",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/parche-pdfjs.mjs",
-    "testflight": "bash scripts/testflight.sh"
+    "testflight": "bash scripts/testflight.sh",
+    "lint": "eslint .",
+    "test": "rm -rf .test-build && tsc -p tsconfig.test.json && node --test $(find .test-build -name \"*.test.js\")"
   },
   "private": true
 }

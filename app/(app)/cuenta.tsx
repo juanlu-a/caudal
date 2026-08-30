@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,18 +21,20 @@ export default function Cuenta() {
   const perfil = usePerfil();
   const saldos = useSaldos();
   const actualizar = useActualizarPerfil();
-  const [nombre, setNombre] = useState('');
+  // El campo arranca mostrando lo guardado y pasa a ser del usuario en cuanto
+  // escribe. Copiar el perfil al estado con un efecto pisaba lo tecleado cada
+  // vez que la query se revalidaba.
+  const [borrador, setBorrador] = useState<string | null>(null);
+  const nombre = borrador ?? perfil.data?.display_name ?? '';
   const [guardado, setGuardado] = useState(false);
-
-  useEffect(() => {
-    if (perfil.data?.display_name != null) setNombre(perfil.data.display_name);
-  }, [perfil.data?.display_name]);
 
   const moneda = perfil.data?.currency ?? 'UYU';
   const banco = perfil.data?.bank ?? BANCO_POR_DEFECTO;
 
   async function guardarNombre() {
     await actualizar.mutateAsync({ display_name: nombre.trim() });
+    // Guardado: el campo vuelve a seguir al perfil.
+    setBorrador(null);
     setGuardado(true);
     setTimeout(() => setGuardado(false), 2000);
   }
@@ -107,7 +109,7 @@ export default function Cuenta() {
       </Panel>
 
       <Panel>
-        <Campo etiqueta="Nombre" value={nombre} onChangeText={setNombre} autoCapitalize="words" />
+        <Campo etiqueta="Nombre" value={nombre} onChangeText={setBorrador} autoCapitalize="words" />
         <View style={styles.accion}>
           <Boton
             variante="secundario"

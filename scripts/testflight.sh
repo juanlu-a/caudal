@@ -1,67 +1,102 @@
 #!/bin/bash
 #
-# Sube un build a TestFlight.
+# Archiva la app y la sube a App Store Connect.
 #
-# Necesita, en el entorno:
-#   APPLE_TEAM_ID   el equipo pago (10 caracteres, sale de developer.apple.com)
-#   ASC_KEY_ID      Key ID de la App Store Connect API
-#   ASC_ISSUER_ID   Issuer ID de esa misma API
-# y la clave privada .p8 guardada en ~/.appstoreconnect/private_keys/
+# Xcode se encarga de la firma: con -allowProvisioningUpdates y la clave de la
+# API crea el certificado de distribución en la nube y el perfil, sin depender
+# de que haya una sesión de Apple ID abierta en la máquina.
 #
-# La app tiene que existir en App Store Connect con el bundle id
-# com.juanabreu.caudal antes del primer envío.
+# Entorno:
+#   APPLE_TEAM_ID                          equipo con el que se firma
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH  clave de App Store Connect
+#   BUILD_NUMBER                           opcional; por defecto, fecha y hora
 #
-# Uso:  npm run testflight
+# Sin clave de API no sube: deja el .ipa para arrastrarlo al Organizer.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 : "${APPLE_TEAM_ID:?falta APPLE_TEAM_ID}"
-: "${ASC_KEY_ID:?falta ASC_KEY_ID}"
-: "${ASC_ISSUER_ID:?falta ASC_ISSUER_ID}"
 
-CLAVE="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-[ -f "$CLAVE" ] || { echo "No está la clave en $CLAVE"; exit 1; }
-
-# Xcode pide y renueva certificados y perfiles con la misma API key, sin depender
-# de que la sesión de Apple ID esté viva en esta Mac.
-AUTH=(-allowProvisioningUpdates
-      -authenticationKeyPath "$CLAVE"
-      -authenticationKeyID "$ASC_KEY_ID"
-      -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-
-ARCHIVO="build/Caudal.xcarchive"
+WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+ESQUEMA=$(basename "$WORKSPACE" .xcworkspace)
+PLIST="ios/$ESQUEMA/Info.plist"
+ARCHIVO="build/$ESQUEMA.xcarchive"
 SALIDA="build/ipa"
 
-echo "==> Regenerando el proyecto nativo"
-npx expo prebuild -p ios --no-clean
+# La fecha y hora en UTC siempre sube y nunca se repite, que es todo lo que App
+# Store Connect pide del número de build. Con segundos y no con minutos: dos
+# ramas que se mergean una detrás de la otra caen en el mismo minuto, y el
+# segundo build se rechaza por número repetido.
+BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M%S)}"
 
-echo "==> Archivando (esto tarda: se compila todo desde fuente)"
+# Expo escribe CFBundleVersion como literal en el Info.plist, así que pasarle
+# CURRENT_PROJECT_VERSION a xcodebuild no alcanza: hay que tocar el plist.
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
+echo "==> $ESQUEMA build $BUILD_NUMBER"
+
+# La clave se busca donde la deja cada quien, igual que en asc.mjs: en CI viene
+# por ASC_KEY_PATH, y en una Mac suele estar en alguna de las carpetas que mira
+# Xcode. xcodebuild la quiere por ruta absoluta.
+if [ -z "${ASC_KEY_PATH:-}" ] && [ -n "${ASC_KEY_ID:-}" ]; then
+  for d in "$HOME/.private_keys" "$HOME/private_keys" "$HOME/.appstoreconnect/private_keys"; do
+    if [ -f "$d/AuthKey_$ASC_KEY_ID.p8" ]; then
+      ASC_KEY_PATH="$d/AuthKey_$ASC_KEY_ID.p8"
+      break
+    fi
+  done
+fi
+
+FIRMA=()
+if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] && [ -n "${ASC_KEY_PATH:-}" ]; then
+  FIRMA=(-allowProvisioningUpdates
+         -authenticationKeyID "$ASC_KEY_ID"
+         -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+         -authenticationKeyPath "$ASC_KEY_PATH")
+  echo "    clave: $ASC_KEY_PATH"
+else
+  echo "    sin clave de API: se archiva y exporta, pero no se sube"
+fi
+
+echo "==> Archivando"
 rm -rf "$ARCHIVO" "$SALIDA"
-xcodebuild -workspace ios/Caudal.xcworkspace \
-  -scheme Caudal \
+xcodebuild -workspace "$WORKSPACE" \
+  -scheme "$ESQUEMA" \
   -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$ARCHIVO" \
-  "${AUTH[@]}" \
+  ${FIRMA[@]+"${FIRMA[@]}"} \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
   archive
 
-echo "==> Exportando el .ipa"
+# Con clave, exportar y subir es un solo paso: destination upload se lo manda a
+# Apple sin pasar por altool.
+DESTINO=upload
+[ ${#FIRMA[@]} -eq 0 ] && DESTINO=export
+
+OPCIONES="$SALIDA/ExportOptions.plist"
+mkdir -p "$SALIDA"
+cat > "$OPCIONES" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key><string>app-store-connect</string>
+  <key>destination</key><string>$DESTINO</string>
+  <key>signingStyle</key><string>automatic</string>
+  <key>teamID</key><string>$APPLE_TEAM_ID</string>
+  <key>uploadSymbols</key><true/>
+  <key>manageAppVersionAndBuildNumber</key><false/>
+</dict>
+</plist>
+PLIST
+
+echo "==> Exportando y subiendo ($DESTINO)"
 xcodebuild -exportArchive \
   -archivePath "$ARCHIVO" \
   -exportPath "$SALIDA" \
-  -exportOptionsPlist scripts/ExportOptions.plist \
-  "${AUTH[@]}"
+  -exportOptionsPlist "$OPCIONES" \
+  ${FIRMA[@]+"${FIRMA[@]}"}
 
-IPA=$(find "$SALIDA" -name "*.ipa" | head -1)
-echo "==> Subiendo $IPA a App Store Connect"
-xcrun altool --upload-app \
-  --type ios \
-  --file "$IPA" \
-  --apiKey "$ASC_KEY_ID" \
-  --apiIssuer "$ASC_ISSUER_ID"
-
-echo
-echo "Listo. En App Store Connect el build queda unos minutos «Procesando»"
-echo "y después aparece en TestFlight."
+echo "$BUILD_NUMBER" > "$SALIDA/build-number.txt"
+echo "==> Listo. Build $BUILD_NUMBER"

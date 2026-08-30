@@ -48,3 +48,6 @@ yarn-error.*
 
 # artefactos de build (.xcarchive, .ipa)
 /build
+
+# salida de los tests
+/.test-build

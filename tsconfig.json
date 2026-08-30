@@ -8,5 +8,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "//": "El de la app, contra React Native. Los tests corren en Node y van por tsconfig.test.json.",
+  "exclude": [
+    "**/__tests__/**"
   ]
 }
