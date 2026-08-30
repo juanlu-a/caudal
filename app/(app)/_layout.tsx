@@ -19,11 +19,10 @@ export default function AppLayout() {
       </NativeTabs.Trigger>
 
       {/*
-        Tab-boton: `disabled` hace que el tap no la seleccione nunca, pero el
-        navegador emite `tabPress` igual y la pantalla placeholder abre el modal.
-        Asi el alta vive dentro de la barra en vez de flotar encima.
+        El alta es una tab mas y no un modal: un sheet de iOS tapa la barra
+        entera, y desde la tab del medio eso hacia desaparecer la navegacion.
       */}
-      <NativeTabs.Trigger name="agregar" disabled>
+      <NativeTabs.Trigger name="agregar">
         <NativeTabs.Trigger.Icon sf="plus" />
         <NativeTabs.Trigger.Label>Movimiento</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>

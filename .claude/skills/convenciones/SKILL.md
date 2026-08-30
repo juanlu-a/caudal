@@ -67,6 +67,18 @@ ios:device`) y se distribuye por TestFlight, nada más. No hace falta aclarar en
 código ni en la doc que algo «no anda en Expo Go»: la mitad de lo que usamos son
 módulos nativos y esa aclaración sobra en todas.
 
+Para mirar un cambio de UI en el simulador sin esperar quince minutos de TestFlight,
+el build nativo se hace una sola vez y después alcanza con Metro y fast refresh. Dos
+cosas que hacen falta y no son obvias:
+
+- **Sin credenciales la app arranca en demo**, con datos sembrados y sin login:
+  `EXPO_NO_DOTENV=1 npx expo start` levanta Metro sin leer el `.env`. Sirve para
+  revisar pantallas sin tocar la base ni pedir la sesión.
+- **El teclado por software no aparece** si el simulador tiene conectado el de
+  hardware: `defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool
+  false` y reiniciar el Simulator. Sin eso, cualquier cosa que se apoye en el teclado
+  se ve como si no existiera.
+
 ## El modelo: cuentas, saldos y transferencias
 
 Un usuario tiene **varias cuentas** (`accounts`): la caja de ahorro en pesos, la de
@@ -176,12 +188,23 @@ tocar esta zona.
   `set -u`. Va `${ARR[@]+"${ARR[@]}"}`.
 - **Un módulo que también es CLI necesita guardia de entry point**, o corre al
   importarlo y se come los argumentos de quien lo importó.
-- **`NativeTabs` no deja interceptar el tap de una tab**: no hay `preventDefault` como
-  en las tabs de react-navigation. Para que la tab del medio sea un boton y no una
-  pantalla, el trigger va con `disabled` — el nativo bloquea la seleccion pero el
-  navegador emite `tabPress` igual, y el placeholder (`app/(app)/agregar.tsx`) escucha
-  ese evento y abre el modal. El contenido de las tabs se monta eager, asi que el
-  listener queda registrado desde el arranque.
+- **Un sheet de iOS tapa la barra de tabs entera.** No hay presentación modal que la
+  deje a la vista: si el alta se abre desde la tab del medio, apretar «Movimiento»
+  hace desaparecer la navegación. Por eso **el alta es una tab de verdad**
+  (`app/(app)/agregar.tsx`), no un modal, con su propio «‹ Atrás» arriba a la
+  izquierda. Como la tab queda montada, el formulario conserva lo tecleado al cambiar
+  de tab: se limpia al guardar y al salir por «Atrás».
+- **`InputAccessoryView` no renderiza nada con la arquitectura nueva.** Se ve el
+  teclado y ninguna barra, sin error. Como el `decimal-pad` tampoco trae tecla de
+  retorno, el «Listo» se pone a mano: una barra absoluta a la altura que anuncia
+  `keyboardWillShow`, fuera del `KeyboardAvoidingView` para que la altura no se cuente
+  dos veces.
+- **`contentInsetAdjustmentBehavior="automatic"` ya suma el safe area.** Sumarle
+  además un `paddingTop: insets.top` deja el doble de aire arriba del encabezado. En
+  las pantallas de tabs va `"never"` y el inset a mano, que es el que se controla.
+- **`Boton` con `ancho="contenido"` hereda la alineación del contenedor.** No se
+  ancla solo: en un panel el contenedor pide `alignItems: 'flex-start'`, y en un
+  `EstadoVacio` sale centrado porque el estado vacío centra.
 - **El simulador no puede linkear SwiftUICore** contra los frameworks precompilados de
   Expo: `PARA_SIMULADOR=1 npx expo prebuild -p ios --no-clean`. Para dispositivo y CI
   van los precompilados, que compilan mucho más rápido.
@@ -193,9 +216,9 @@ tocar esta zona.
 ```
 app/                  rutas (expo-router)
   (auth)/             ingresar · crear-cuenta
-  (app)/              tabs: mes · movimiento (alta) · historial
+  (app)/              tabs: mes · movimiento · historial
+    agregar.tsx       alta de movimiento, manual o desde el banco
   cuenta.tsx          perfil y preferencias, desde el avatar de Mes
-  nuevo.tsx           alta de movimiento, manual o desde el banco
 src/
   components/         Cifra, Panel, FilaMovimiento, GraficoBarras…
   features/

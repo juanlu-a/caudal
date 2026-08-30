@@ -78,15 +78,6 @@ function Navegacion() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="confirmado" />
       <Stack.Screen
-        name="nuevo"
-        options={{
-          presentation: 'modal',
-          headerShown: true,
-          title: 'Agregar movimiento',
-          ...encabezado,
-        }}
-      />
-      <Stack.Screen
         name="movimiento/[id]"
         options={{
           headerShown: true,
