@@ -180,8 +180,13 @@ Dos ramas largas, y cada una tiene su público:
 
 | Rama | Grupo de TestFlight | Quién lo recibe | Revisión de Apple |
 |---|---|---|---|
-| `staging` (por defecto) | **Equipo** — interno | Solo las cuentas del equipo | No |
+| `staging` (por defecto) | **Equipo** — interno | Solo yo, en mi teléfono | No |
 | `main` | **Testers** — externo | Cualquiera con el [link público](https://testflight.apple.com/join/QJmaF4wy) | Sí, la primera vez y en cada versión |
+
+`staging` es donde veo las cosas primero, sin esperar a nadie: un build interno está
+instalable a los quince minutos del merge. Lo que me convence pasa a `main`. Los
+grupos internos no tienen link — el build aparece directamente en la app TestFlight
+del iPhone.
 
 Todo sale de `staging`: rama de feature → PR a `staging` → merge, y el merge sube
 solo al grupo interno. **Promover** es abrir un PR de `staging` a `main`; ese merge
