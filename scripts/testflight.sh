@@ -33,12 +33,25 @@ BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
 echo "==> $ESQUEMA build $BUILD_NUMBER"
 
+# La clave se busca donde la deja cada quien, igual que en asc.mjs: en CI viene
+# por ASC_KEY_PATH, y en una Mac suele estar en alguna de las carpetas que mira
+# Xcode. xcodebuild la quiere por ruta absoluta.
+if [ -z "${ASC_KEY_PATH:-}" ] && [ -n "${ASC_KEY_ID:-}" ]; then
+  for d in "$HOME/.private_keys" "$HOME/private_keys" "$HOME/.appstoreconnect/private_keys"; do
+    if [ -f "$d/AuthKey_$ASC_KEY_ID.p8" ]; then
+      ASC_KEY_PATH="$d/AuthKey_$ASC_KEY_ID.p8"
+      break
+    fi
+  done
+fi
+
 FIRMA=()
 if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] && [ -n "${ASC_KEY_PATH:-}" ]; then
   FIRMA=(-allowProvisioningUpdates
          -authenticationKeyID "$ASC_KEY_ID"
          -authenticationKeyIssuerID "$ASC_ISSUER_ID"
          -authenticationKeyPath "$ASC_KEY_PATH")
+  echo "    clave: $ASC_KEY_PATH"
 else
   echo "    sin clave de API: se archiva y exporta, pero no se sube"
 fi
@@ -50,7 +63,7 @@ xcodebuild -workspace "$WORKSPACE" \
   -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$ARCHIVO" \
-  "${FIRMA[@]}" \
+  ${FIRMA[@]+"${FIRMA[@]}"} \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
   archive
 
@@ -81,7 +94,7 @@ xcodebuild -exportArchive \
   -archivePath "$ARCHIVO" \
   -exportPath "$SALIDA" \
   -exportOptionsPlist "$OPCIONES" \
-  "${FIRMA[@]}"
+  ${FIRMA[@]+"${FIRMA[@]}"}
 
 echo "$BUILD_NUMBER" > "$SALIDA/build-number.txt"
 echo "==> Listo. Build $BUILD_NUMBER"

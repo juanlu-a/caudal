@@ -153,15 +153,33 @@ const revisiones = Object.fromEntries(
     .map((x) => [x.id, x.attributes.betaReviewState]),
 );
 
-const aQuitar = (delGrupo.datos?.data ?? []).filter((b) => {
-  if (b.id === build.id) return false;
-  if (esInterno) return true;
+const SE_CONSERVAN = ['APPROVED', 'WAITING_FOR_REVIEW', 'IN_REVIEW'];
 
+/**
+ * En qué estado de revisión está un build del grupo. Sale del include, y si por
+ * lo que sea no vino, se pregunta: quitar del grupo externo el único build que
+ * la gente puede instalar es peor que una llamada de más.
+ */
+async function estadoDeRevision(b) {
+  const delInclude = revisiones[b.relationships?.betaAppReviewSubmission?.data?.id];
+  if (delInclude) return delInclude;
+
+  const r = await asc('GET', `/v1/builds/${b.id}/betaAppReviewSubmission`);
+  if (!r.ok) {
+    aviso(`no se pudo ver la revisión del build ${b.attributes.version}: se deja en el grupo`);
+    return 'APPROVED';
+  }
+  return r.datos?.data?.attributes?.betaReviewState ?? null;
+}
+
+const otros = (delGrupo.datos?.data ?? []).filter((b) => b.id !== build.id);
+const aQuitar = [];
+for (const b of otros) {
   // En el externo se conservan el último aprobado —para que el link no quede
   // vacío mientras el nuevo espera— y los que están en revisión.
-  const estado = revisiones[b.relationships?.betaAppReviewSubmission?.data?.id];
-  return !['APPROVED', 'WAITING_FOR_REVIEW', 'IN_REVIEW'].includes(estado);
-});
+  if (!esInterno && SE_CONSERVAN.includes(await estadoDeRevision(b))) continue;
+  aQuitar.push(b);
+}
 
 if (aQuitar.length) {
   const r = await asc('DELETE', `/v1/betaGroups/${grupo.id}/relationships/builds`, {
