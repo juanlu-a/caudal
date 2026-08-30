@@ -25,8 +25,6 @@ npx expo run:ios            # simulador
 npm run ios:device          # iPhone por cable
 ```
 
-`NativeTabs` no funciona en Expo Go: hay que correr el dev build.
-
 Para el **simulador** hay que regenerar el proyecto nativo desde fuente:
 
 ```sh
@@ -163,7 +161,8 @@ familia propio. Los `.ttf` quedan versionados en `assets/fonts`.
 ```
 app/                  rutas (expo-router)
   (auth)/             ingresar · crear-cuenta
-  (app)/              tabs: mes · movimientos · cuenta
+  (app)/              tabs: mes · movimiento (alta) · historial
+  cuenta.tsx          perfil y preferencias, desde el avatar de Mes
   nuevo.tsx           alta de movimiento (modal)
   movimiento/[id].tsx detalle y borrado
 src/
