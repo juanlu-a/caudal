@@ -29,7 +29,7 @@ type Estado = {
 
 let cache: Estado | null = null;
 
-const CATEGORIAS: Array<[string, string, number]> = [
+const CATEGORIAS: [string, string, number][] = [
   ['Alimentos', 'alimentos', 0],
   ['Transporte', 'transporte', 1],
   ['Vivienda', 'vivienda', 2],
@@ -41,7 +41,7 @@ const CATEGORIAS: Array<[string, string, number]> = [
 ];
 
 /** Movimientos de ejemplo, iguales en cada instalacion: sin azar, para poder comparar. */
-const SEMILLA: Array<[number, number, string, number]> = [
+const SEMILLA: [number, number, string, number][] = [
   // [meses atras, dia del mes, categoria, monto con signo]
   [0, 13, 'Otros', 62_000],
   [0, 14, 'Alimentos', -2_480],

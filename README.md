@@ -172,23 +172,94 @@ src/
   theme/              color, tipografía, espaciado, radios, movimiento
   lib/                supabase y formato de cifras
 supabase/migrations/  esquema con RLS
-scripts/              build-fonts.py · build-icons.mjs
+scripts/              build-fonts.py · build-icons.mjs · testflight.sh · asc.mjs
 ```
 
-## TestFlight
+## Ramas y TestFlight
 
-Requiere la cuenta paga de Apple Developer. La primera vez hay que crear la app en
-App Store Connect con el bundle id `com.juanabreu.caudal`, y una clave de la
-App Store Connect API (*Users and Access → Integrations*), que se guarda en
-`~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8`.
+Dos ramas largas, y cada una tiene su público:
+
+| Rama | Grupo de TestFlight | Quién lo recibe | Revisión de Apple |
+|---|---|---|---|
+| `staging` (por defecto) | **Equipo** — interno | Solo las cuentas del equipo | No |
+| `main` | **Testers** — externo | Cualquiera con el [link público](https://testflight.apple.com/join/QJmaF4wy) | Sí, la primera vez y en cada versión |
+
+Todo sale de `staging`: rama de feature → PR a `staging` → merge, y el merge sube
+solo al grupo interno. **Promover** es abrir un PR de `staging` a `main`; ese merge
+es el que sale al link público.
+
+Cada grupo ve **un solo build**: al asignar el nuevo, el script saca los anteriores.
+Así nadie instala por error uno viejo, que es lo que pasa cuando la lista se
+acumula. En el grupo externo se conserva el último aprobado hasta que Apple
+aprueba el nuevo, para no dejar el link sin nada que instalar mientras tanto.
+
+Para probar una rama de feature sin tocar ninguna de las dos, *Actions → TestFlight →
+Run workflow*, se elige la rama y el destino (`interno` por defecto).
+
+**Si un build sale mal, no se despublica: se arregla y se sube otro.** Un revert
+en `main` es un merge más, y sube igual.
+
+### Números de build
+
+`AAAAMMDDhhmmss` en UTC, puesto por `scripts/testflight.sh` sobre el `Info.plist`
+ya generado. Siempre sube y nunca repite, que es todo lo que App Store Connect
+pide. El número de corrida de Actions no servía: se reinicia si se recrea el
+workflow. Los segundos tampoco sobran: al promover, el merge a `staging` y el de
+`staging` a `main` caen en el mismo minuto.
+
+Expo escribe `CFBundleVersion` como literal al hacer prebuild, así que pasarle
+`CURRENT_PROJECT_VERSION` a `xcodebuild` no alcanza — hay que tocar el plist.
+
+### Antes de compilar
+
+`lint`, `typecheck` y `test` corren primero, en los dos workflows. Un build de iOS
+en un runner de Apple no baja de 40 minutos: no vale la pena gastarlos para
+enterarse al final de que faltaba un tipo.
 
 ```sh
-export APPLE_TEAM_ID=...     # el equipo pago
-export ASC_KEY_ID=...
-export ASC_ISSUER_ID=...
-npm run testflight
+npm run lint
+npm run typecheck
+npm test        # runner de Node, sin dependencias de testing
 ```
 
-El script regenera el proyecto nativo, archiva, exporta el `.ipa` y lo sube. El
-`buildNumber` de `app.config.ts` tiene que subir en cada envío: App Store Connect
-rechaza dos builds con el mismo número.
+Los tests cubren el formato de cifras y los lectores de PDF, que es donde están las
+decisiones que no se ven: de dónde sale el signo, cómo se separan pesos de dólares,
+qué es un traspaso entre cuentas propias. Las líneas de PDF de los tests están
+escritas a mano — los extractos de verdad no entran en el repo.
+
+### Subir a mano desde la Mac
+
+```sh
+export APPLE_TEAM_ID=VPNXQ8K2P8
+export ASC_KEY_ID=... ASC_ISSUER_ID=...
+# la clave: se busca sola en ~/.private_keys, ~/private_keys y
+# ~/.appstoreconnect/private_keys, o se apunta con ASC_KEY_PATH
+
+npx expo prebuild --platform ios --no-install && (cd ios && pod install)
+npm run testflight
+node scripts/testflight-distribute.mjs \
+  --build-number "$(cat build/ipa/build-number.txt)" --group Equipo --internal
+```
+
+`testflight.sh` archiva y sube en un solo paso (`destination: upload` en las
+opciones de export), sin pasar por `altool`. Xcode se encarga de la firma con
+`-allowProvisioningUpdates` y la clave de la API: crea el certificado y el perfil
+en la nube, sin depender de que haya una sesión de Apple ID abierta en la máquina.
+
+`testflight-distribute.mjs` espera a que Apple termine de procesar **ese** build —
+no el último que haya, que es distinto: procesar tarda minutos y el anterior ya
+está listo — y recién ahí lo asigna, escribe las notas y, si el grupo es externo,
+lo manda a revisión.
+
+### Puesta a punto, una sola vez
+
+1. App creada en App Store Connect con el bundle id `com.juanabreu.caudal`.
+2. Clave de la App Store Connect API (*Users and Access → Integrations*), rol
+   App Manager.
+3. Los secrets del repo: `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`,
+   `ASC_KEY_P8` (el contenido del `.p8`), `EXPO_PUBLIC_SUPABASE_URL`,
+   `EXPO_PUBLIC_SUPABASE_KEY`.
+4. La información de Beta App Review en App Store Connect (contacto y qué probar):
+   se completa a mano y queda para siempre.
+
+El `.p8` del runner se escribe en `$RUNNER_TEMP`, que se borra al terminar el job.

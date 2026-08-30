@@ -1,0 +1,30 @@
+{
+  "//": "Los tests corren con el runner de Node, que necesita JavaScript: esto compila src a CommonJS en .test-build. Aparte del tsconfig de la app, que apunta a React Native.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "6.0",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": ".test-build",
+    "types": [
+      "node"
+    ],
+    "rootDir": "./src"
+  },
+  "include": [
+    "src/lib/**/*.ts",
+    "src/features/importacion/**/*.ts",
+    "src/types/**/*.ts"
+  ],
+  "exclude": [
+    "src/features/importacion/pdf.ts",
+    "src/features/importacion/archivo.ts",
+    "src/features/importacion/PanelDeImportacion.tsx"
+  ]
+}

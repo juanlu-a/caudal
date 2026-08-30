@@ -1,0 +1,36 @@
+name: CI
+
+# La misma verificación que corre antes de un build de TestFlight, pero sola y
+# en dos minutos. En main y staging no corre acá: ahí ya la corre TestFlight y
+# duplicarla solo agrega un check redundante al commit.
+on:
+  pull_request:
+    branches: [main, staging]
+  push:
+    branches-ignore: [main, staging]
+
+concurrency:
+  # Por rama y no por ref: con un PR abierto, el push y el pull_request son dos
+  # eventos con ref distinto y la misma rama. Agrupándolos por rama, el segundo
+  # cancela al primero en vez de correr lo mismo dos veces en paralelo.
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
