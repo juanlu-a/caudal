@@ -10,7 +10,10 @@ on:
     branches-ignore: [main, staging]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Por rama y no por ref: con un PR abierto, el push y el pull_request son dos
+  # eventos con ref distinto y la misma rama. Agrupándolos por rama, el segundo
+  # cancela al primero en vez de correr lo mismo dos veces en paralelo.
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -19,9 +22,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
