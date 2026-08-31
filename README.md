@@ -64,16 +64,22 @@ de la rampa cuando alguien crea la cuenta.
 
 ## Importar del banco
 
-**Agregar movimiento → Desde el banco**, y se trae el PDF tal cual lo descarga el banco.
-No hay que decir qué documento es: entre los lectores del banco elegido, el que lo
-reconoce es el correcto. Hoy se leen tres formatos de Itaú, y el archivo se lee dentro
+**Agregar movimiento → Desde el banco**, y se trae el archivo tal cual lo descarga el
+banco. No hay que decir qué documento es: entre los lectores del banco elegido, el que lo
+reconoce es el correcto. Hoy se leen cuatro formatos de Itaú, y el archivo se lee dentro
 del teléfono — los estados de cuenta no salen del dispositivo.
 
 | Archivo | Qué trae |
 |---|---|
-| Estado de cuenta mensual | Secciones en pesos y en dólares, con saldo de apertura y cierre |
+| Estado de cuenta mensual (PDF) | Secciones en pesos y en dólares, con saldo de apertura y cierre |
+| Estado de cuenta en Excel | Una cuenta por archivo, con moneda, número y saldo anterior y final |
 | Resumen de tarjeta | Consumos y pagos, con columna de pesos y de dólares |
 | Consulta de Itaú Link | El mes en curso, con débito y crédito en columnas separadas |
+
+La planilla tiene lector propio y no el genérico: la moneda, el número de cuenta y los
+saldos con que se controla la lectura están fuera de la tabla, en un encabezado aparte.
+Sin esos dos saldos no hay contra qué cuadrar y el saldo de la cuenta nunca llega a
+coincidir con el del banco.
 
 El texto plano de un PDF no alcanza: el resumen de tarjeta sale con las descripciones de
 un lado y los importes del otro. `src/features/importacion/pdf.ts` reconstruye la tabla

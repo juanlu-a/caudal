@@ -2,7 +2,12 @@ import { File } from 'expo-file-system';
 import * as XLSX from 'xlsx';
 
 import { buscarBanco, type IdDeBanco } from './bancos';
-import { leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta } from './itau';
+import {
+  leerEstadoDeCuenta,
+  leerLinkDeItau,
+  leerPlanillaDeItau,
+  leerResumenDeTarjeta,
+} from './itau';
 import { leerPdf, type LineaDePdf } from './pdf';
 import { interpretar, type Matriz } from './parser';
 import { ErrorDeArchivo, type Lectura, type OrigenDeArchivo } from './tipos';
@@ -42,6 +47,11 @@ export type OpcionesDeArchivo = {
 /** Los lectores de cada banco, en orden de exigencia. */
 const LECTORES: Partial<Record<IdDeBanco, ((lineas: LineaDePdf[]) => Lectura)[]>> = {
   itau: [leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta],
+};
+
+/** Lo mismo para las planillas, que cada banco arma a su manera. */
+const LECTORES_DE_PLANILLA: Partial<Record<IdDeBanco, ((matriz: Matriz) => Lectura)[]>> = {
+  itau: [leerPlanillaDeItau],
 };
 
 /**
@@ -117,6 +127,11 @@ function hojasDe(bytes: Uint8Array): { nombre: string; matriz: Matriz }[] {
 /**
  * Planillas. Prueba hoja por hoja y se queda con la primera que tenga una tabla
  * de movimientos reconocible: los extractos suelen traer una portada antes.
+ *
+ * Primero se prueba el lector del banco, que sabe dónde están la moneda, el
+ * número de cuenta y los saldos con que se controla la lectura. El genérico
+ * queda como red: entiende cualquier planilla con fecha e importe, pero no
+ * puede cuadrar contra nada.
  */
 function leerPlanilla(
   bytes: Uint8Array,
@@ -126,8 +141,18 @@ function leerPlanilla(
   if (hojas.length === 0) throw new ErrorDeArchivo('El archivo no tiene ninguna hoja con datos.');
 
   let ultimoError: ErrorDeArchivo | null = null;
+  const delBanco = LECTORES_DE_PLANILLA[buscarBanco(opciones.banco).id] ?? [];
 
   for (const hoja of hojas) {
+    for (const leer of delBanco) {
+      try {
+        return leer(hoja.matriz);
+      } catch (e) {
+        if (!(e instanceof ErrorDeArchivo)) throw e;
+        ultimoError = e;
+      }
+    }
+
     try {
       const resultado = interpretar(hoja.matriz, opciones);
       const avisos = [...resultado.avisos];
@@ -143,7 +168,8 @@ function leerPlanilla(
             moneda: resultado.moneda ?? opciones.monedaPorDefecto ?? 'UYU',
             identificador: null,
             filas: resultado.filas,
-            // Una planilla no trae saldos con que controlar la lectura.
+            // El lector genérico no sabe dónde busca los saldos este banco, así
+            // que esta lectura no se puede controlar contra nada.
             apertura: null,
             cierre: null,
             descuadre: null,

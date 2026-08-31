@@ -54,9 +54,19 @@ const TRASPASO = /(traspaso|transferencia)\s+(a|de|desde|hacia)?\s*(\d{5,})/;
  * Frases con las que aparece el pago de la tarjeta en el estado de cuenta.
  * Si se importa tambien el resumen de la tarjeta, este movimiento y las compras
  * que lo componen son la misma plata: por eso se marca como transferencia.
+ *
+ * Las dos ultimas alternativas son como lo escribe Itaú de verdad, y sin ellas
+ * el pago no se reconocia de ninguno de los dos lados: «DEB. VARIOS VISA-ILINK»
+ * en la cuenta y «PAGOS» a secas en el resumen. El resultado era que la misma
+ * plata contaba como gasto dos veces, que es justo lo que las cuentas
+ * separadas existen para evitar.
+ *
+ * «visa» sola no alcanza para reconocerlo: «TATA 320 VISA CRED» es una compra
+ * en el super. Por eso se pide el «ilink» que Itaú le pega al medio de pago, y
+ * «pagos» tiene que ser la descripcion entera.
  */
 const PAGO_DE_TARJETA =
-  /(pago|pgo)\s+(de\s+)?(tarjeta|tj|tc|visa|master|mastercard|oca|amex)|tarjeta\s+de\s+credito|pago\s+resumen|pago\s+recibido|su\s+pago|pago\s+minimo|pago\s+contado/;
+  /(pago|pgo)\s+(de\s+)?(tarjeta|tj|tc|visa|master|mastercard|oca|amex)|tarjeta\s+de\s+credito|pago\s+resumen|pago\s+recibido|su\s+pago|pago\s+minimo|pago\s+contado|^pagos?$|(visa|master|mastercard|oca|amex)\s*ilink/;
 
 /**
  * Pistas para adivinar la categoria por el nombre del comercio. Es una ayuda,

@@ -127,9 +127,14 @@ tarjeta las descripciones salen por un lado y los importes por otro. `pdf.ts`
 reconstruye la tabla con las coordenadas de pdf.js, agrupando por altura y ordenando
 por posición.
 
-Tres lectores, todos de Itaú: estado de cuenta mensual, resumen de tarjeta y consulta
-de Itaú Link (el mes en curso). Al soltar un archivo no se le pregunta al usuario qué
-es: entre los lectores del banco elegido, el que lo reconoce es el correcto.
+Cuatro lectores, todos de Itaú: estado de cuenta mensual, resumen de tarjeta, consulta
+de Itaú Link (el mes en curso) y el estado de cuenta que el banco exporta a Excel. Al
+soltar un archivo no se le pregunta al usuario qué es: entre los lectores del banco
+elegido, el que lo reconoce es el correcto.
+
+La planilla también tiene lector propio, y no el genérico de `parser.ts`: la moneda, el
+número de cuenta y los saldos de apertura y cierre están fuera de la tabla. El genérico
+los ignora, y sin saldos la lectura no se controla contra nada.
 
 **El signo no está escrito en el PDF.** Sale de cómo se movió el saldo corriente, o de
 en qué columna cae el importe. Eso permite algo que vale más que la comodidad: cada

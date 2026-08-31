@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { leerEstadoDeCuenta, leerLinkDeItau, leerResumenDeTarjeta } from '../itau';
+import {
+  leerEstadoDeCuenta,
+  leerLinkDeItau,
+  leerPlanillaDeItau,
+  leerResumenDeTarjeta,
+} from '../itau';
+import type { Matriz } from '../parser';
 import type { LineaDePdf } from '../pdf';
 
 /**
@@ -69,6 +75,68 @@ test('separa la seccion en pesos de la de dolares', () => {
   assert.equal(r.secciones[1].descuadre, 0);
 });
 
+// ------------------------------------------------- estado de cuenta en planilla
+
+// La planilla que Itaú exporta a Excel: la moneda, el numero de cuenta y los
+// saldos con que se controla la lectura viven arriba, fuera de la tabla.
+const PLANILLA: Matriz = [
+  ['', 'Nombre', '', '', 'Tipo de cuenta', 'Moneda', 'Nro de cuenta', '', ''],
+  ['', 'PEREZ MARIA', '', '', 'Caja de Ahorro', 'Dólares', '3650979', '', ''],
+  ['', 'Fecha', 'Concepto', '', 'Débito', 'Crédito', 'Saldo', 'Referencia', 'Destino'],
+  ['', '31/07/2026', 'SALDO ANTERIOR', '', '', '', 4071.37, '', ''],
+  ['', '03/08/2026', 'COMPRA      CAFE DORE', '', 5.64, '', 4065.73, '020826 MARIA PEREZ', ''],
+  ['', '03/08/2026', 'REDIVA 17934CAFE DORE', '', '', 0.46, 4066.19, '', ''],
+  ['', '05/08/2026', 'DEB.CONTRATO6385747 012', '', '', 0, 4066.19, '', ''],
+  ['', '17/08/2026', 'TRASPASO A  3650987ILINK', '', 66.19, '', 4000, '', ''],
+  ['', '', 'SALDO FINAL', '', '', '', 4000, '', ''],
+];
+
+test('la planilla saca la moneda y el numero de cuenta del encabezado', () => {
+  const s = leerPlanillaDeItau(PLANILLA).secciones[0];
+  // Sin esto, un extracto en dolares se importa como si fueran pesos.
+  assert.equal(s.moneda, 'USD');
+  assert.equal(s.identificador, '3650979');
+});
+
+test('la planilla cuadra contra el saldo anterior y el saldo final', () => {
+  const s = leerPlanillaDeItau(PLANILLA).secciones[0];
+  assert.equal(s.apertura, 4071.37);
+  assert.equal(s.cierre, 4000);
+  assert.equal(s.descuadre, 0);
+});
+
+test('en la planilla el debito resta y el credito suma', () => {
+  const s = leerPlanillaDeItau(PLANILLA).secciones[0];
+  assert.equal(s.filas[0].monto, -5.64);
+  assert.equal(s.filas[1].monto, 0.46);
+});
+
+test('la descripcion sale del concepto, que es lo unico que dice algo', () => {
+  const s = leerPlanillaDeItau(PLANILLA).secciones[0];
+  // La referencia de una compra es la fecha y el nombre del titular: si se
+  // toma esa, no hay con que reconocer el traspaso ni el pago de la tarjeta.
+  assert.equal(s.filas[0].descripcion, 'Compra Cafe Dore');
+  assert.equal(s.filas[2].descripcion, 'Traspaso A 3650987ilink');
+});
+
+test('la fila de importe cero se saltea y se avisa', () => {
+  const r = leerPlanillaDeItau(PLANILLA);
+  assert.equal(r.secciones[0].filas.length, 3);
+  assert.ok(r.avisos.some((a) => a.includes('una fila de importe cero')));
+});
+
+test('la planilla avisa cuando una fila no explica el saldo', () => {
+  const rota = PLANILLA.map((f) => [...f]);
+  // El importe dice una cosa y el saldo corriente, otra.
+  rota[4][4] = 500;
+  const r = leerPlanillaDeItau(rota);
+  assert.ok(r.avisos.some((a) => a.includes('no cierra con el saldo')));
+});
+
+test('una planilla que no es de Itaú se rechaza para que la lea el generico', () => {
+  assert.throws(() => leerPlanillaDeItau([['fecha', 'importe']]), /tabla de movimientos/);
+});
+
 // ------------------------------------------------------------ resumen de tarjeta
 
 // Las columnas de importe se distinguen por su borde derecho: la de pesos y la
@@ -111,6 +179,44 @@ test('la columna de la derecha son dolares, no pesos', () => {
   assert.ok(dolares, 'tiene que reconocer la seccion en dolares');
   assert.equal(dolares!.filas.length, 1);
   assert.equal(dolares!.filas[0].monto, 10);
+});
+
+// Un consumo en el exterior trae tres numeros: el importe en la moneda de
+// origen, que no es de ninguna de las dos columnas, y el importe en dolares. El
+// recargo por consumos en el exterior se cobra pero no tiene fila propia: sale
+// suelto en el encabezado.
+const EXTERIOR: LineaDePdf[] = [
+  linea(['26/08/26']),
+  linea(['32,00%', '9,00%'], [360, 463]),
+  linea(['0,04'], [522]),
+  linea(['SALDO DEL ESTADO DE CUENTA ANTERIOR', '1.000,00', '0,00'], [281, 419, 465]),
+  linea(['200826', '4023', 'APPLE.COM/BILL', '2,99', '2,99'], [100, 125, 201, 415, 533]),
+  linea(['210826', '4023', 'KINKO', '210,00'], [100, 125, 163, 474]),
+  linea(['SALDO CONTADO', '1.210,00', '3,03'], [167, 474, 533]),
+];
+
+test('el importe en la moneda de origen no se cuela en la descripcion', () => {
+  const dolares = leerResumenDeTarjeta(EXTERIOR).secciones.find((s) => s.moneda === 'USD')!;
+  assert.equal(dolares.filas[0].descripcion, 'Apple.com/Bill');
+  assert.equal(dolares.filas[0].monto, -2.99);
+});
+
+test('el recargo por consumos en el exterior cierra el saldo en dolares', () => {
+  const dolares = leerResumenDeTarjeta(EXTERIOR).secciones.find((s) => s.moneda === 'USD')!;
+  const recargo = dolares.filas.find((f) => f.descripcion.includes('Recargo'));
+  assert.ok(recargo, 'el recargo del encabezado tiene que entrar como cargo');
+  assert.equal(recargo!.monto, -0.04);
+  assert.equal(recargo!.fecha, '2026-08-26', 'va a la fecha de cierre del resumen');
+  assert.equal(dolares.descuadre, 0);
+});
+
+test('si el recargo no explica lo que falta, no se inventa el movimiento', () => {
+  const otro = EXTERIOR.map((l) =>
+    l.celdas[0] === 'SALDO CONTADO' ? linea(['SALDO CONTADO', '1.210,00', '3,10'], [167, 474, 533]) : l,
+  );
+  const dolares = leerResumenDeTarjeta(otro).secciones.find((s) => s.moneda === 'USD')!;
+  assert.equal(dolares.filas.some((f) => f.descripcion.includes('Recargo')), false);
+  assert.equal(dolares.descuadre, -0.11);
 });
 
 // --------------------------------------------------------- consulta de Itaú Link

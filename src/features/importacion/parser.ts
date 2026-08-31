@@ -20,8 +20,15 @@ type Columna = 'fecha' | 'descripcion' | 'importe' | 'debito' | 'credito' | 'sal
 
 /**
  * Nombres con los que cada banco llama a lo mismo. Se comparan normalizados
- * (sin tildes ni puntuacion), y gana el match mas largo para que «fecha valor»
- * no se lo lleve «fecha» si estan las dos.
+ * (sin tildes ni puntuacion) y **el orden de cada lista es el de preferencia**:
+ * si dos columnas distintas de la misma planilla reclaman el mismo campo, gana
+ * la que aparece antes en la lista.
+ *
+ * No es un detalle: el estado de cuenta de Itaú trae «Concepto» y «Referencia»
+ * a la vez, y la referencia de una compra es «010826 JUAN LUCAS ABREU MAR».
+ * Quedarse con esa en vez de «COMPRA EL CAFECITO» deja todos los movimientos
+ * sin descripcion util, y con eso se cae todo lo que se apoya en el texto: el
+ * pago de tarjeta, los traspasos entre cuentas propias y la categoria.
  */
 const NOMBRES: Record<Columna, string[]> = {
   fecha: [
@@ -43,12 +50,14 @@ const NOMBRES: Record<Columna, string[]> = {
     'detalle',
     'detalle movimiento',
     'movimiento',
-    'referencia',
     'comercio',
     'nombre comercio',
-    'observaciones',
-    'glosa',
     'description',
+    'glosa',
+    'observaciones',
+    // Ultima a proposito: la referencia de Itaú es la fecha y el nombre del
+    // titular. Solo sirve cuando no hay ninguna otra columna con texto.
+    'referencia',
   ],
   importe: ['importe', 'monto', 'valor', 'importe operacion', 'amount', 'total'],
   debito: ['debito', 'debitos', 'debe', 'cargo', 'cargos', 'egreso', 'egresos', 'retiro'],
@@ -61,22 +70,25 @@ type Mapa = Partial<Record<Columna, number>>;
 
 function detectarColumnas(fila: unknown[]): Mapa {
   const mapa: Mapa = {};
-  const largos: Partial<Record<Columna, number>> = {};
+  const prioridades: Partial<Record<Columna, number>> = {};
 
   fila.forEach((celda, i) => {
     const texto = normalizar(aTexto(celda));
     if (!texto) return;
 
     for (const [columna, alias] of Object.entries(NOMBRES) as [Columna, string[]][]) {
-      for (const nombre of alias) {
+      alias.forEach((nombre, prioridad) => {
         // Coincidencia exacta o el encabezado empieza con el alias: «importe $»,
         // «debito uyu». Evita que «saldo anterior» se tome como saldo de la fila.
         const coincide = texto === nombre || texto.startsWith(`${nombre} `);
-        if (!coincide) continue;
-        if ((largos[columna] ?? 0) >= nombre.length) continue;
+        if (!coincide) return;
+        // Menor es mejor: se queda la columna que el banco nombra de la forma
+        // mas directa, no la que casualmente tiene el alias mas largo.
+        const actual = prioridades[columna];
+        if (actual != null && actual <= prioridad) return;
         mapa[columna] = i;
-        largos[columna] = nombre.length;
-      }
+        prioridades[columna] = prioridad;
+      });
     }
   });
 

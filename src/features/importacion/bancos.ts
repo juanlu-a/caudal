@@ -22,7 +22,8 @@ export const BANCOS: Banco[] = [
     id: 'itau',
     nombre: 'Itaú',
     soportado: true,
-    acepta: 'El estado de cuenta, el resumen de la tarjeta o la consulta de Itaú Link, en PDF.',
+    acepta:
+      'El estado de cuenta en PDF o en Excel, el resumen de la tarjeta o la consulta de Itaú Link.',
   },
   { id: 'santander', nombre: 'Santander', soportado: false },
   { id: 'brou', nombre: 'BROU', soportado: false },

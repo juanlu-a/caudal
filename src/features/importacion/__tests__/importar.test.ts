@@ -111,6 +111,24 @@ test('en el resumen, el pago recibido tambien es el mismo movimiento', () => {
   assert.equal(plan.pagosDeTarjeta, 1);
 });
 
+test('el pago de la tarjeta se reconoce como lo escribe Itaú', () => {
+  // En el estado de cuenta el pago sale asi, sin la palabra «tarjeta» a la
+  // vista. Sin reconocerlo, el pago cuenta como gasto y las compras del
+  // resumen tambien: la misma plata dos veces.
+  const plan = planear([fila('2026-08-21', -6000, 'DEB. VARIOS VISA-ILINK')]);
+  assert.equal(plan.pagosDeTarjeta, 1);
+});
+
+test('en el resumen de Itaú el pago recibido dice «PAGOS» y nada mas', () => {
+  const plan = planear([fila('2026-08-21', 6000, 'PAGOS')], { origen: 'tarjeta' });
+  assert.equal(plan.pagosDeTarjeta, 1);
+});
+
+test('una compra pagada con la visa no es un pago de tarjeta', () => {
+  const plan = planear([fila('2026-08-25', -301, 'TATA 320 VISA CRED')]);
+  assert.equal(plan.pagosDeTarjeta, 0);
+});
+
 test('un traspaso a otra cuenta propia no es gasto ni ingreso', () => {
   // 3650979 es la cuenta en dolares de la misma persona.
   const plan = planear([fila('2026-07-15', 283.23, 'TRASPASO DE 3650979')], {

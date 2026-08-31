@@ -1,3 +1,4 @@
+import type { Matriz } from './parser';
 import type { LineaDePdf } from './pdf';
 import {
   ErrorDeArchivo,
@@ -5,7 +6,14 @@ import {
   type Lectura,
   type SeccionImportable,
 } from './tipos';
-import { limpiarDescripcion, normalizar, parsearImporte } from './valores';
+import {
+  aTexto,
+  limpiarDescripcion,
+  normalizar,
+  parsearFecha,
+  parsearImporte,
+  parsearMoneda,
+} from './valores';
 
 /**
  * Lectura de los estados de cuenta de Itaú Uruguay en PDF.
@@ -186,6 +194,151 @@ export function leerEstadoDeCuenta(lineas: LineaDePdf[]): Lectura {
   return { origen: 'cuenta', secciones: conMovimientos, ...periodo(conMovimientos), avisos };
 }
 
+// -------------------------------------------- estado de cuenta en planilla
+
+/**
+ * El estado de cuenta que Itaú exporta a Excel. Es el mismo período que el PDF
+ * mensual, pero con las columnas ya separadas: no hay tabla que reconstruir.
+ *
+ * Tiene lector propio y no el genérico de planillas porque lo que define el
+ * cuadre está fuera de la tabla, en un encabezado con la moneda, el número de
+ * cuenta y —sobre todo— el saldo anterior y el saldo final. Sin esos dos
+ * números la lectura no se controla contra nada y el saldo de la cuenta nunca
+ * llega a coincidir con el del banco, que es lo único que la app promete.
+ */
+const ENCABEZADO_PLANILLA = ['fecha', 'concepto', 'debito', 'credito', 'saldo'];
+
+/** Cómo llama Itaú al número de cuenta arriba de todo. */
+const NUMERO_DE_CUENTA = ['nro de cuenta', 'numero de cuenta', 'nro cuenta', 'cuenta'];
+
+export function leerPlanillaDeItau(matriz: Matriz): Lectura {
+  const titulosDe = (fila: unknown[] | undefined) =>
+    (fila ?? []).map((celda) => normalizar(aTexto(celda)));
+
+  const iEncabezado = matriz.findIndex((fila) => {
+    const titulos = titulosDe(fila);
+    return ENCABEZADO_PLANILLA.every((nombre) => titulos.includes(nombre));
+  });
+
+  if (iEncabezado === -1) {
+    throw new ErrorDeArchivo(
+      'La planilla no tiene la tabla de movimientos de Itaú. Tiene que ser el estado de cuenta tal cual lo bajás del banco.',
+    );
+  }
+
+  const titulos = titulosDe(matriz[iEncabezado]);
+  const iFecha = titulos.indexOf('fecha');
+  const iConcepto = titulos.indexOf('concepto');
+  const iDebito = titulos.indexOf('debito');
+  const iCredito = titulos.indexOf('credito');
+  const iSaldo = titulos.indexOf('saldo');
+
+  const cabecera = cabeceraDePlanilla(matriz.slice(0, iEncabezado), titulosDe);
+  const moneda = cabecera.moneda;
+
+  const filas: FilaImportada[] = [];
+  const avisos: string[] = [];
+  let apertura: number | null = null;
+  let cierre: number | null = null;
+  let saldo: number | null = null;
+  let enCero = 0;
+
+  for (let i = iEncabezado + 1; i < matriz.length; i++) {
+    const cruda = matriz[i] ?? [];
+    const concepto = normalizar(aTexto(cruda[iConcepto]));
+    const saldoDeLaFila = parsearImporte(cruda[iSaldo]);
+
+    if (concepto.startsWith('saldo anterior')) {
+      apertura = saldoDeLaFila;
+      saldo = saldoDeLaFila;
+      continue;
+    }
+    if (concepto.startsWith('saldo final')) {
+      cierre = saldoDeLaFila;
+      continue;
+    }
+
+    const fecha = parsearFecha(cruda[iFecha]);
+    if (!fecha) continue;
+
+    const debito = Math.abs(parsearImporte(cruda[iDebito]) ?? 0);
+    const credito = Math.abs(parsearImporte(cruda[iCredito]) ?? 0);
+    const monto = redondear(credito - debito);
+
+    // El saldo corriente confirma fila por fila lo que dicen las dos columnas.
+    if (saldo != null && saldoDeLaFila != null && Math.abs(saldo + monto - saldoDeLaFila) > 0.01) {
+      avisos.push(
+        `El movimiento del ${fecha} no cierra con el saldo de la fila. Revisalo antes de importar.`,
+      );
+    }
+    if (saldoDeLaFila != null) saldo = saldoDeLaFila;
+
+    if (monto === 0) {
+      // Un movimiento de cero no existe para la app y el saldo no se movió:
+      // saltearlo no cambia el cuadre.
+      enCero++;
+      continue;
+    }
+
+    filas.push({
+      fecha,
+      descripcion: limpiarDescripcion(aTexto(cruda[iConcepto])),
+      monto,
+      saldo: saldoDeLaFila,
+      moneda,
+      fila: i + 1,
+    });
+  }
+
+  if (filas.length === 0) {
+    throw new ErrorDeArchivo('La planilla no tiene movimientos en el período que muestra.');
+  }
+
+  if (enCero > 0) {
+    avisos.push(
+      enCero === 1
+        ? 'Se salteó una fila de importe cero, que no mueve el saldo.'
+        : `Se saltearon ${enCero} filas de importe cero, que no mueven el saldo.`,
+    );
+  }
+
+  const seccion: SeccionImportable = {
+    moneda,
+    identificador: cabecera.numero,
+    filas,
+    apertura,
+    cierre,
+    descuadre:
+      apertura != null && cierre != null
+        ? redondear(filas.reduce((s, f) => s + f.monto, apertura) - cierre)
+        : null,
+  };
+
+  return { origen: 'cuenta', secciones: [seccion], ...periodo([seccion]), avisos };
+}
+
+/** Arriba de la tabla, en dos filas: los títulos y abajo los valores. */
+function cabeceraDePlanilla(
+  lineas: Matriz,
+  titulosDe: (fila: unknown[] | undefined) => string[],
+): { moneda: string; numero: string | null } {
+  for (let i = 0; i < lineas.length; i++) {
+    const titulos = titulosDe(lineas[i]);
+    const iMoneda = titulos.indexOf('moneda');
+    const iNumero = titulos.findIndex((t) => NUMERO_DE_CUENTA.includes(t));
+    if (iMoneda === -1 && iNumero === -1) continue;
+
+    const valores = lineas[i + 1] ?? [];
+    return {
+      // Sin moneda declarada se asume la del país: el archivo en dólares sí la trae.
+      moneda: (iMoneda === -1 ? null : parsearMoneda(valores[iMoneda])) ?? 'UYU',
+      numero: (iNumero === -1 ? '' : aTexto(valores[iNumero])) || null,
+    };
+  }
+
+  return { moneda: 'UYU', numero: null };
+}
+
 // ----------------------------------------------------------- resumen de tarjeta
 
 /** Cargos del resumen que no vienen con fecha propia: van a la fecha de cierre. */
@@ -278,7 +431,14 @@ export function leerResumenDeTarjeta(lineas: LineaDePdf[]): Lectura {
 
     // El código de la tarjeta («4023») no aporta nada a la descripción.
     const desde = fechaPropia && /^\d{4}$/.test(celdas[1] ?? '') ? 2 : 1;
-    const descripcion = limpiarDescripcion(celdas.slice(desde, indices[0]).join(' '));
+    // La descripción termina en el primer número de la fila, no en el primer
+    // importe de una columna conocida: un consumo en el exterior trae antes el
+    // importe en la moneda de origen, que no cae en ninguna de las dos columnas
+    // y si no se corta acá se cuela en el texto.
+    const primerImporte = celdas.findIndex((celda, i) => i >= desde && esImporte(celda));
+    const descripcion = limpiarDescripcion(
+      celdas.slice(desde, primerImporte === -1 ? indices[0] : primerImporte).join(' '),
+    );
 
     for (const i of indices) {
       const importe = parsearImporte(celdas[i]);
@@ -299,15 +459,39 @@ export function leerResumenDeTarjeta(lineas: LineaDePdf[]): Lectura {
   }
 
   const identificador = buscarTarjeta(lineas);
+  const recargo = recargoDelEncabezado(lineas);
+
   const secciones: SeccionImportable[] = [...porMoneda.entries()].map(([moneda, filas]) => {
     const apertura = anterior.get(moneda) ?? null;
     const cierreDelBanco = contado.get(moneda) ?? null;
     // El resumen informa deuda: sube con los consumos y baja con los pagos, o sea
     // al revés que los montos de Caudal. De ahí el menos.
-    const descuadre =
+    let descuadre =
       apertura != null && cierreDelBanco != null
         ? redondear(apertura - filas.reduce((s, f) => s + f.monto, 0) - cierreDelBanco)
         : null;
+
+    // El recargo por consumos en el exterior se cobra igual que un consumo pero
+    // no tiene fila: el resumen lo imprime suelto en el encabezado. Se toma solo
+    // cuando explica exactamente lo que falta para llegar al saldo del banco. Si
+    // no cierra no se inventa nada y el descuadre queda a la vista, que para eso
+    // está.
+    if (
+      descuadre != null &&
+      descuadre < 0 &&
+      recargo != null &&
+      Math.abs(-descuadre - recargo) < 0.005
+    ) {
+      filas.push({
+        fecha: cierre ?? filas[filas.length - 1].fecha,
+        descripcion: 'Recargo por consumos en el exterior',
+        monto: descuadre,
+        saldo: null,
+        moneda,
+        fila: 1,
+      });
+      descuadre = 0;
+    }
 
     return { moneda, identificador, filas, apertura, cierre: cierreDelBanco, descuadre };
   });
@@ -324,6 +508,29 @@ export function leerResumenDeTarjeta(lineas: LineaDePdf[]): Lectura {
   }
 
   return { origen: 'tarjeta', secciones, ...periodo(secciones), avisos };
+}
+
+/**
+ * El único importe suelto que el resumen imprime arriba de la tabla, que es
+ * donde Itaú pone el recargo por consumos en el exterior. El resto del
+ * encabezado son tasas —terminan en «%» y no pasan por importe— o pares de
+ * cifras del límite y el disponible, que vienen acompañadas en la misma línea.
+ */
+function recargoDelEncabezado(lineas: LineaDePdf[]): number | null {
+  const iTabla = lineas.findIndex(
+    (l) =>
+      normalizar(l.celdas[0] ?? '').startsWith('saldo del estado de cuenta anterior') ||
+      fechaDeTarjeta(l.celdas[0] ?? '') != null,
+  );
+
+  const sueltos = lineas
+    .slice(0, iTabla === -1 ? lineas.length : iTabla)
+    .filter((l) => l.celdas.length === 1 && esImporte(l.celdas[0]))
+    .map((l) => parsearImporte(l.celdas[0]))
+    .filter((v): v is number => v != null);
+
+  // Si hay más de uno no se sabe cuál es: mejor no elegir.
+  return sueltos.length === 1 ? sueltos[0] : null;
 }
 
 /** Los últimos cuatro dígitos con los que el resumen identifica la tarjeta. */
